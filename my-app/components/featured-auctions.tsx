@@ -98,7 +98,7 @@ export default function FeaturedAuctions() {
                 </div>
               </Link>
               <Link
-                href={`/auction/${auction.id}`}
+                href={`./auction/${auction.id}`}
                 className="w-full mt-2 py-2 px-4 bg-green-500 hover:bg-green-600 text-white rounded-md text-center block transition-colors"
               >
                 Place Bid
