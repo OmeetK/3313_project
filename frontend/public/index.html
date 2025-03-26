@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transaction System</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Transaction System</h1>
+        
+        <div class="card" id="connection-panel">
+            <h2>Server Connection</h2>
+            <div class="form-group">
+                <label for="server-address">Server Address:</label>
+                <input type="text" id="server-address" value="localhost">
+            </div>
+            <div class="form-group">
+                <label for="server-port">Port:</label>
+                <input type="number" id="server-port" value="8080">
+            </div>
+            <button id="connect-btn" class="primary-btn">Connect</button>
+            <p id="connection-status" class="status"></p>
+        </div>
+        
+        <div class="card hidden" id="auth-panel">
+            <div class="tabs">
+                <div class="tab active" data-tab="login">Login</div>
+                <div class="tab" data-tab="register">Register</div>
+            </div>
+            
+            <div class="tab-content active" id="login-content">
+                <div class="form-group">
+                    <label for="username">Username:</label>
+                    <input type="text" id="username">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password">
+                </div>
+                <button id="login-btn" class="primary-btn">Login</button>
+            </div>
+            
+            <div class="tab-content" id="register-content">
+                <div class="form-group">
+                    <label for="reg-username">Username:</label>
+                    <input type="text" id="reg-username">
+                </div>
+                <div class="form-group">
+                    <label for="reg-password">Password:</label>
+                    <input type="password" id="reg-password">
+                </div>
+                <button id="register-btn" class="primary-btn">Register</button>
+            </div>
+        </div>
+        
+        <div class="card hidden" id="transaction-panel">
+            <div class="header">
+                <h2>Transaction Manager</h2>
+                <div>
+                    <span id="username-display"></span>
+                    <button id="logout-btn" class="secondary-btn">Logout</button>
+                </div>
+            </div>
+            
+            <div class="transaction-controls">
+                <button id="begin-btn" class="primary-btn">Begin Transaction</button>
+                <button id="commit-btn" class="primary-btn" disabled>Commit</button>
+                <button id="rollback-btn" class="danger-btn" disabled>Rollback</button>
+            </div>
+            
+            <div class="form-group">
+                <label for="operation">Operation:</label>
+                <textarea id="operation" rows="3" placeholder="Enter operation details" disabled></textarea>
+            </div>
+            <button id="execute-btn" class="primary-btn" disabled>Execute Operation</button>
+            
+            <div class="transaction-status">
+                <p>Current Transaction: <span id="transaction-id">None</span></p>
+            </div>
+        </div>
+        
+        <div class="card" id="log-panel">
+            <h2>Server Logs</h2>
+            <div id="log-container"></div>
+            <button id="clear-log-btn" class="secondary-btn">Clear Logs</button>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
