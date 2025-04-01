@@ -49,10 +49,10 @@ export default function HomePage() {
                   <User className="h-6 w-6" />
                 </Link>
                 <Link
-                  href="/login"
+                  href="/auth/register"
                   className="hidden md:inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-500 hover:bg-green-600"
                 >
-                  Login
+                  Login/Sign Up
                 </Link>
               </div>
             </div>

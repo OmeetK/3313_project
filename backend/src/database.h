@@ -19,8 +19,8 @@ public:
     bool initialize();
     
     // User management
-    bool createUser(const std::string& username, const std::string& password);
-    bool authenticateUser(const std::string& username, const std::string& password);
+    bool createUser(const std::string& username, const std::string& email, const std::string& password);
+    int authenticateUser(const std::string& username, const std::string& password);
     
     // Transaction management
     int beginTransaction(const std::string& username);

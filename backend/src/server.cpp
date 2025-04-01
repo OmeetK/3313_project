@@ -88,12 +88,12 @@ private:
             c = toupper(c);
         }
         
-        // Handle authentication
         if (cmd == "LOGIN") {
             std::string username, password;
             iss >> username >> password;
-            
-            if (database.authenticateUser(username, password)) {
+        
+            int userId = database.authenticateUser(username, password);
+            if (userId != -1) {
                 this->authenticated = true;
                 this->username = username;
                 return "Login successful!\n";
@@ -104,16 +104,15 @@ private:
         
         // Register new user
         if (cmd == "REGISTER") {
-            std::string username, password;
-            iss >> username >> password;
-            
-            if (database.createUser(username, password)) {
+            std::string username, email, password;
+            iss >> username >> email >> password;
+        
+            if (database.createUser(username, email, password)) {
                 return "Registration successful!\n";
             } else {
                 return "Username already exists or registration failed.\n";
             }
         }
-        
         // All other commands require authentication
         if (!authenticated) {
             return "Please login first.\n";
