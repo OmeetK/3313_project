@@ -10,7 +10,7 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 // Configuration
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 const CPP_SERVER_HOST = process.env.CPP_SERVER_HOST || 'localhost';
 const CPP_SERVER_PORT = process.env.CPP_SERVER_PORT || 8080;
 
@@ -22,8 +22,8 @@ const connections = new Map();
 
 // WebSocket connection handler
 wss.on('connection', (ws) => {
-    console.log('Client connected to WebSocket');
-    
+    console.log('Client connected to WebSocket proxy server');
+
     // Create TCP connection to C++ server
     const tcpClient = new net.Socket();
     
@@ -40,13 +40,16 @@ wss.on('connection', (ws) => {
     // Buffer for incomplete messages
     let buffer = '';
     
-    // Handle data from C++ server
+    // Handle TCP responses from the C++ backend server
     tcpClient.on('data', (data) => {
-        const response = data.toString();
-        console.log('Received from C++ server:', response);
+        console.log('Received response from C++ server:', data.toString());
+        ws.send(JSON.stringify({
+            type: 'server',
+            message: data.toString()
+        }));
         
         // Add to buffer
-        buffer += response;
+        buffer += data.toString();
         
         // Process complete messages (assuming messages end with newline)
         const messages = buffer.split('\n');
@@ -96,10 +99,11 @@ wss.on('connection', (ws) => {
             const data = JSON.parse(message);
             
             if (data.type === 'command') {
-                console.log('Sending command to C++ server:', data.command);
-                
+                console.log('Received command from client:', data.command);
+
                 if (tcpClient && tcpClient.writable) {
-                    // Send command with newline for message boundary
+                    // Forward the command to the C++ backend server
+                    console.log('Sending command to C++ server:', data.command);
                     tcpClient.write(data.command + '\n');
                 } else {
                     ws.send(JSON.stringify({
@@ -117,7 +121,7 @@ wss.on('connection', (ws) => {
         }
     });
     
-    // Handle WebSocket close
+    // Handle WebSocket close event
     ws.on('close', () => {
         console.log('WebSocket client disconnected');
         

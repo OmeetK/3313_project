@@ -33,11 +33,20 @@ bool Database::createTablesIfNotExist() {
         // Create Users table
         executeQuery(
             "CREATE TABLE IF NOT EXISTS users ("
-            "id SERIAL PRIMARY KEY,"
-            "username VARCHAR(50) UNIQUE NOT NULL,"
-            "password VARCHAR(100) NOT NULL,"
-            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+            "user_id SERIAL PRIMARY KEY,"
+            "username VARCHAR(100) UNIQUE NOT NULL,"
+            "email VARCHAR(100) NOT NULL,"
+            "password VARCHAR(255) NOT NULL,"
+            "balance NUMERIC(10, 2) DEFAULT 0.00"
             ");"
+        );
+        executeQuery(
+            "CREATE TABLE users2 ("
+                "user_id SERIAL PRIMARY KEY,"
+                "username VARCHAR(100) NOT NULL,"
+                "email VARCHAR(100) NOT NULL UNIQUE,"
+                "password VARCHAR(255) NOT NULL"
+            ");"        
         );
         
         // Create Transactions table
@@ -80,15 +89,15 @@ bool Database::executeQuery(const std::string& query) {
     }
 }
 
-bool Database::createUser(const std::string& username, const std::string& password) {
+bool Database::createUser(const std::string& username, const std::string& email, const std::string& password) {
     try {
         std::lock_guard<std::mutex> lock(db_mutex);
         
         // In a real application, you should hash the password
-        std::string query = "INSERT INTO users (username, password) "
-                            "VALUES ('" + username + "', '" + password + "') "
-                            "ON CONFLICT (username) DO NOTHING;";
-        
+        std::string query = "INSERT INTO users (username, email, password, balance) "
+                            "VALUES ('" + username + "', '" + email + "', '" + password + "', 0.00) "
+                            "RETURNING user_id;";
+
         pqxx::work txn(*conn);
         pqxx::result result = txn.exec(query);
         txn.commit();
