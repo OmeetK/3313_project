@@ -1,4 +1,4 @@
-"use client" // only necessary if you plan to use client-side hooks or state
+"use client" // only necessary if you plan to use client-side hooks or states
 
 import React from "react"
 
