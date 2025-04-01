@@ -11,6 +11,7 @@
 #include <chrono>
 #include <fstream>
 #include "database.h"
+#include "user.h"
 
 // Platform-specific socket headers
 #ifdef _WIN32
@@ -92,7 +93,8 @@ private:
             std::string username, password;
             iss >> username >> password;
         
-            int userId = database.authenticateUser(username, password);
+            User user(database);
+            int userId = user.authenticateUser(username, password);
             if (userId != -1) {
                 this->authenticated = true;
                 this->username = username;
@@ -106,8 +108,9 @@ private:
         if (cmd == "REGISTER") {
             std::string username, email, password;
             iss >> username >> email >> password;
-        
-            if (database.createUser(username, email, password)) {
+
+            User user(database);
+            if (user.createUser(username, email, password)) {
                 return "Registration successful!\n";
             } else {
                 return "Username already exists or registration failed.\n";
@@ -118,65 +121,65 @@ private:
             return "Please login first.\n";
         }
         
-        // Transaction commands
-        if (cmd == "BEGIN") {
-            if (currentTransaction != -1) {
-                return "You already have an active transaction.\n";
-            }
+        // Transaction commands commented out for now
+        // if (cmd == "BEGIN") {
+        //     if (currentTransaction != -1) {
+        //         return "You already have an active transaction.\n";
+        //     }
             
-            currentTransaction = database.beginTransaction(username);
-            if (currentTransaction != -1) {
-                return "Transaction " + std::to_string(currentTransaction) + " started.\n";
-            } else {
-                return "Failed to start transaction.\n";
-            }
-        }
+        //     currentTransaction = database.beginTransaction(username);
+        //     if (currentTransaction != -1) {
+        //         return "Transaction " + std::to_string(currentTransaction) + " started.\n";
+        //     } else {
+        //         return "Failed to start transaction.\n";
+        //     }
+        // }
         
-        if (cmd == "EXECUTE") {
-            if (currentTransaction == -1) {
-                return "No active transaction. Begin one with BEGIN command.\n";
-            }
+        // if (cmd == "EXECUTE") {
+        //     if (currentTransaction == -1) {
+        //         return "No active transaction. Begin one with BEGIN command.\n";
+        //     }
             
-            std::string operation;
-            std::getline(iss, operation);
-            operation = operation.substr(operation.find_first_not_of(" \t")); // Trim leading whitespace
+        //     std::string operation;
+        //     std::getline(iss, operation);
+        //     operation = operation.substr(operation.find_first_not_of(" \t")); // Trim leading whitespace
             
-            if (database.executeOperation(currentTransaction, operation)) {
-                return "Operation executed successfully.\n";
-            } else {
-                return "Operation failed!\n";
-            }
-        }
+        //     if (database.executeOperation(currentTransaction, operation)) {
+        //         return "Operation executed successfully.\n";
+        //     } else {
+        //         return "Operation failed!\n";
+        //     }
+        // }
         
-        if (cmd == "COMMIT") {
-            if (currentTransaction == -1) {
-                return "No active transaction to commit.\n";
-            }
+        // if (cmd == "COMMIT") {
+        //     if (currentTransaction == -1) {
+        //         return "No active transaction to commit.\n";
+        //     }
             
-            int transId = currentTransaction;
-            currentTransaction = -1;
+        //     int transId = currentTransaction;
+        //     currentTransaction = -1;
             
-            if (database.commitTransaction(transId)) {
-                return "Transaction " + std::to_string(transId) + " committed successfully.\n";
-            } else {
-                return "Failed to commit transaction " + std::to_string(transId) + ".\n";
-            }
-        }
+        //     if (database.commitTransaction(transId)) {
+        //         return "Transaction " + std::to_string(transId) + " committed successfully.\n";
+        //     } else {
+        //         return "Failed to commit transaction " + std::to_string(transId) + ".\n";
+        //     }
+        // }
         
-        if (cmd == "ROLLBACK") {
-            if (currentTransaction == -1) {
-                return "No active transaction to rollback.\n";
-            }
+        // if (cmd == "ROLLBACK") {
+        //     if (currentTransaction == -1) {
+        //         return "No active transaction to rollback.\n";
+        //     }
             
-            int transId = currentTransaction;
-            currentTransaction = -1;
+        //     int transId = currentTransaction;
+        //     currentTransaction = -1;
             
-            if (database.rollbackTransaction(transId)) {
-                return "Transaction " + std::to_string(transId) + " rolled back.\n";
-            } else {
-                return "Failed to rollback transaction " + std::to_string(transId) + ".\n";
-            }
-        }
+        //     if (database.rollbackTransaction(transId)) {
+        //         return "Transaction " + std::to_string(transId) + " rolled back.\n";
+        //     } else {
+        //         return "Failed to rollback transaction " + std::to_string(transId) + ".\n";
+        //     }
+        // }
         
         if (cmd == "EXIT" || cmd == "QUIT") {
             running = false;
