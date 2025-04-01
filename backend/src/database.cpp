@@ -79,6 +79,16 @@ bool Database::createTablesIfNotExist() {
 
 bool Database::executeQuery(const std::string& query) {
     try {
+        if (!conn || !conn->is_open()) {
+            std::cerr << "Database connection lost. Attempting to reconnect..." << std::endl;
+            conn = std::make_unique<pqxx::connection>(connection_string);
+            if (!conn->is_open()) {
+                std::cerr << "Failed to reconnect to the database." << std::endl;
+                return false;
+            }
+            std::cout << "Reconnected to the database." << std::endl;
+        }
+
         pqxx::work txn(*conn);
         txn.exec(query);
         txn.commit();
@@ -110,31 +120,43 @@ bool Database::createUser(const std::string& username, const std::string& email,
     }
 }
 
-bool Database::authenticateUser(const std::string& username, const std::string& password) {
+int Database::authenticateUser(const std::string& username, const std::string& password) {
     try {
         std::lock_guard<std::mutex> lock(db_mutex);
-        
-        std::string query = "SELECT id FROM users WHERE username = '" + 
+
+        // Construct the query
+        std::string query = "SELECT user_id FROM users WHERE username = '" +
                             username + "' AND password = '" + password + "';";
-        
+
+        // Print the query for debugging
+        std::cout << "Executing query: " << query << std::endl;
+
+        // Execute the query
         pqxx::work txn(*conn);
         pqxx::result result = txn.exec(query);
         txn.commit();
+
         
-        // User is authenticated if we found a matching record
-        return !result.empty();
+        if (!result.empty()) {
+            int userId = result[0][0].as<int>();
+            std::cout << "Authentication successful for user: " << username 
+                      << ". User ID: " << userId << std::endl;
+            return userId; // Return user_id
+        }
+
+        std::cout << "Authentication failed for user: " << username << std::endl;
+        return -1; 
     } catch (const std::exception& e) {
         std::cerr << "Error authenticating user: " << e.what() << std::endl;
-        return false;
+        return -1; 
     }
 }
-
 int Database::beginTransaction(const std::string& username) {
     try {
         std::lock_guard<std::mutex> lock(db_mutex);
         
         // Get user ID
-        std::string userQuery = "SELECT id FROM users WHERE username = '" + username + "';";
+        std::string userQuery = "SELECT user_id FROM users WHERE username = '" + username + "';";
         pqxx::work userTxn(*conn);
         pqxx::result userResult = userTxn.exec(userQuery);
         userTxn.commit();

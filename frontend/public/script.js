@@ -159,20 +159,10 @@ function login() {
     
     // Simulate server response
     setTimeout(() => {
-        // For demo, accept admin/admin123 and user1/password1
-        if ((username === 'admin' && password === 'admin123') || 
-            (username === 'user1' && password === 'password1')) {
-            isAuthenticated = true;
-            currentUsername = username;
-            
-            addLog('SERVER', 'Login successful!');
-            
-            // Show transaction panel
-            authPanel.classList.add('hidden');
-            transactionPanel.classList.remove('hidden');
-            usernameDisplay.textContent = username;
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify(message));
         } else {
-            addLog('SERVER', 'Invalid username or password.');
+            addLog('ERROR', 'WebSocket is not connected');
         }
     }, 500);
 }

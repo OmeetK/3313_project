@@ -88,12 +88,12 @@ private:
             c = toupper(c);
         }
         
-        // Handle authentication
         if (cmd == "LOGIN") {
             std::string username, password;
             iss >> username >> password;
-            
-            if (database.authenticateUser(username, password)) {
+        
+            int userId = database.authenticateUser(username, password);
+            if (userId != -1) {
                 this->authenticated = true;
                 this->username = username;
                 return "Login successful!\n";
