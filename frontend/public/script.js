@@ -87,30 +87,56 @@ function switchTab(tabName) {
 // Connect to server
 function connectToServer() {
     const address = serverAddressInput.value || 'localhost';
-    const port = serverPortInput.value || '8080';
-    
+    const port = serverPortInput.value || '4000'; // Proxy server port
+
     if (isConnected) {
         socket.close();
         isConnected = false;
     }
-    
+
     connectionStatus.textContent = 'Connecting...';
-    
+
     try {
-        // For a real implementation, you would use WebSockets
-        // For this demo, we'll simulate the connection
-        setTimeout(() => {
+        // Create a new WebSocket connection to the proxy server
+        socket = new WebSocket(`ws://${address}:${port}`);
+
+        // Handle WebSocket open event
+        socket.onopen = () => {
             isConnected = true;
-            connectionStatus.textContent = 'Connected to server';
-            
+            connectionStatus.textContent = 'Connected to proxy server';
+
             // Show authentication panel
             connectionPanel.classList.add('hidden');
             authPanel.classList.remove('hidden');
-            
+
             // Log welcome message
-            addLog('SERVER', 'Welcome to the Transaction Server');
-            addLog('SERVER', 'Please login with LOGIN username password or register with REGISTER username password');
-        }, 1000);
+            addLog('SERVER', 'Connected to the WebSocket proxy server');
+        };
+
+        // Handle WebSocket message event
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'server') {
+                addLog('SERVER', data.message);
+            } else if (data.type === 'error') {
+                addLog('ERROR', data.message);
+            }
+        };
+
+        // Handle WebSocket close event
+        socket.onclose = () => {
+            isConnected = false;
+            connectionStatus.textContent = 'Disconnected from proxy server';
+            connectionPanel.classList.remove('hidden');
+            authPanel.classList.add('hidden');
+            transactionPanel.classList.add('hidden');
+        };
+
+        // Handle WebSocket error event
+        socket.onerror = (error) => {
+            connectionStatus.textContent = `Connection error: ${error.message}`;
+            isConnected = false;
+        };
     } catch (error) {
         connectionStatus.textContent = `Connection failed: ${error.message}`;
         isConnected = false;
@@ -133,42 +159,38 @@ function login() {
     
     // Simulate server response
     setTimeout(() => {
-        // For demo, accept admin/admin123 and user1/password1
-        if ((username === 'admin' && password === 'admin123') || 
-            (username === 'user1' && password === 'password1')) {
-            isAuthenticated = true;
-            currentUsername = username;
-            
-            addLog('SERVER', 'Login successful!');
-            
-            // Show transaction panel
-            authPanel.classList.add('hidden');
-            transactionPanel.classList.remove('hidden');
-            usernameDisplay.textContent = username;
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify(message));
         } else {
-            addLog('SERVER', 'Invalid username or password.');
+            addLog('ERROR', 'WebSocket is not connected');
         }
     }, 500);
 }
 
 function register() {
-    const username = regUsernameInput.value;
-    const password = regPasswordInput.value;
-    
-    if (!username || !password) {
-        addLog('ERROR', 'Please enter both username and password');
+    const username = document.getElementById('reg-username').value;
+    const email = document.getElementById('reg-email').value;
+    const password = document.getElementById('reg-password').value;
+
+    if (!username || !email || !password) {
+        addLog('ERROR', 'Please enter username, email, and password');
         return;
     }
-    
-    // Send register command
-    const command = `REGISTER ${username} ${password}`;
-    addLog('COMMAND', command);
-    
-    // Simulate server response
-    setTimeout(() => {
-        addLog('SERVER', 'Registration successful!');
-        switchTab('login');
-    }, 500);
+
+    // Construct the JSON message
+    const message = {
+        type: 'command',
+        command: `REGISTER ${username} ${email} ${password}`
+    };
+
+    addLog('COMMAND', message.command);
+
+    // Send the JSON message to the WebSocket server
+    if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify(message));
+    } else {
+        addLog('ERROR', 'WebSocket is not connected');
+    }
 }
 
 function logout() {
