@@ -5,11 +5,10 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import websocketService from '../../lib/websocket';
 
-export default function RegisterPage() {
+export default function LoginPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
     username: '',
-    email: '',
     password: '',
   });
   const [error, setError] = useState('');
@@ -26,47 +25,53 @@ export default function RegisterPage() {
     }
 
     // Listen for server responses
-    websocketService.on('message', (data) => {
+    websocketService.on('server', (data) => {
       setIsLoading(false);
-      console.log('Response:', data);
+      console.log('Login response:', data);
       
-      if (data.response && data.response.includes('Registration successful')) {
-        // Redirect to login page on successful registration
-        router.push('/auth/login');
-      } else if (data.response && (data.response.includes('already exists') || data.response.includes('failed'))) {
-        setError('Username already exists or registration failed');
+      if (data.message.includes('Login successful')) {
+        // Store user in localStorage or a context
+        localStorage.setItem('user', formData.username);
+        // Redirect to browse page after successful login
+        router.push('/browse');
+      } else if (data.message.includes('Invalid username or password')) {
+        setError('Invalid username or password');
       }
     });
 
     return () => {
       // Clean up event listeners if needed
     };
-  }, [router]);
+  }, [router, formData.username]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError('');
-
+    setIsLoading(true);
+    
     try {
-      console.log('Sending registration:', formData);
-      websocketService.sendCommand(`REGISTER ${formData.username} ${formData.email} ${formData.password}`);
-    } catch (err: any) {
-      console.error('Registration error:', err);
-      setError(err.message || 'Failed to register');
+      console.log('Login submitted:', formData);
+      
+      // Send login command to WebSocket server
+      websocketService.sendCommand(`LOGIN ${formData.username} ${formData.password}`);
+      
+      // Response will be handled by the useEffect listener
+    } catch (err) {
+      setError('Connection error. Please try again.');
       setIsLoading(false);
+      console.error('Login error:', err);
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-        <h1 className="text-2xl font-bold mb-4">Register</h1>
+        <h1 className="text-2xl font-bold mb-4">Login</h1>
         
         {error && (
           <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
@@ -91,23 +96,7 @@ export default function RegisterPage() {
             />
           </div>
           
-          <div className="mb-4">
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-              Email
-            </label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
-              placeholder="Enter your email"
-              required
-            />
-          </div>
-          
-          <div className="mb-4">
+          <div className="mb-6">
             <label htmlFor="password" className="block text-sm font-medium text-gray-700">
               Password
             </label>
@@ -128,15 +117,15 @@ export default function RegisterPage() {
             disabled={isLoading}
             className={`w-full bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600 ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
           >
-            {isLoading ? 'Registering...' : 'Register'}
+            {isLoading ? 'Logging in...' : 'Login'}
           </button>
         </form>
         
         <div className="mt-5 text-center">
           <p className="text-gray-600">
-            Already have an account?{' '}
-            <Link href="/auth/login" className="text-green-500 hover:text-green-600">
-              Login
+            Don't have an account?{' '}
+            <Link href="/auth/register" className="text-green-500 hover:text-green-600">
+              Register
             </Link>
           </p>
         </div>
