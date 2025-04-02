@@ -132,7 +132,7 @@ export default function AuctionDetailPage({ params }: { params: { id: string } }
                         step={auction.minBidIncrement}
                         value={bidAmount}
                         onChange={(e) => setBidAmount(Number(e.target.value))}
-                        className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                        className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-green-500 text-black"
                       />
                     </div>
                     <button
@@ -142,7 +142,7 @@ export default function AuctionDetailPage({ params }: { params: { id: string } }
                       Place Bid
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500">Enter ${auction.currentBid + auction.minBidIncrement} or more</p>
+                  <p className="text-xs text-black">Enter ${auction.currentBid + auction.minBidIncrement} or more</p>
                 </form>
               </div>
 

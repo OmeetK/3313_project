@@ -71,43 +71,61 @@ export default function SellPage() {
             <p className="text-gray-600 mt-2">Fill out the details below to start selling your item</p>
           </div>
 
-          {/* Progress Steps */}
-          <div className="px-6 py-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div
-                  className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                    currentStep >= 1 ? "bg-green-500 text-white" : "bg-gray-200 text-gray-600"
-                  }`}
-                >
-                  1
-                </div>
-                <div className="ml-2 text-sm font-medium">Item Details</div>
-              </div>
-              <div className={`flex-grow mx-4 h-1 ${currentStep >= 2 ? "bg-green-500" : "bg-gray-200"}`}></div>
-              <div className="flex items-center">
-                <div
-                  className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                    currentStep >= 2 ? "bg-green-500 text-white" : "bg-gray-200 text-gray-600"
-                  }`}
-                >
-                  2
-                </div>
-                <div className="ml-2 text-sm font-medium">Images & Description</div>
-              </div>
-              <div className={`flex-grow mx-4 h-1 ${currentStep >= 3 ? "bg-green-500" : "bg-gray-200"}`}></div>
-              <div className="flex items-center">
-                <div
-                  className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                    currentStep >= 3 ? "bg-green-500 text-white" : "bg-gray-200 text-gray-600"
-                  }`}
-                >
-                  3
-                </div>
-                <div className="ml-2 text-sm font-medium">Pricing & Shipping</div>
-              </div>
-            </div>
-          </div>
+         {/* Progress Steps */}
+<div className="px-6 py-4 border-b border-gray-200">
+  <div className="flex items-center justify-between">
+    
+    {/* Step 1 */}
+    <div className="flex items-center">
+      <div
+        className={`flex items-center justify-center w-8 h-8 rounded-full ${
+          currentStep >= 1 ? "bg-green-500 text-white" : "bg-gray-200 text-gray-600"
+        }`}
+      >
+        1
+      </div>
+      <div className={`ml-2 text-sm font-medium ${currentStep >= 1 ? "text-black" : "text-gray-400"}`}>
+        Item Details
+      </div>
+    </div>
+
+    {/* Line between Step 1 & 2 */}
+    <div className={`flex-grow mx-4 h-1 ${currentStep >= 2 ? "bg-green-500" : "bg-gray-200"}`}></div>
+
+    {/* Step 2 */}
+    <div className="flex items-center">
+      <div
+        className={`flex items-center justify-center w-8 h-8 rounded-full ${
+          currentStep >= 2 ? "bg-green-500 text-white" : "bg-gray-200 text-gray-600"
+        }`}
+      >
+        2
+      </div>
+      <div className={`ml-2 text-sm font-medium ${currentStep >= 2 ? "text-black" : "text-gray-400"}`}>
+        Images & Description
+      </div>
+    </div>
+
+    {/* Line between Step 2 & 3 */}
+    <div className={`flex-grow mx-4 h-1 ${currentStep >= 3 ? "bg-green-500" : "bg-gray-200"}`}></div>
+
+    {/* Step 3 */}
+    <div className="flex items-center">
+      <div
+        className={`flex items-center justify-center w-8 h-8 rounded-full ${
+          currentStep >= 3 ? "bg-green-500 text-white" : "bg-gray-200 text-gray-600"
+        }`}
+      >
+        3
+      </div>
+      <div className={`ml-2 text-sm font-medium ${currentStep >= 3 ? "text-black" : "text-gray-400"}`}>
+        Pricing & Shipping
+      </div>
+    </div>
+    
+  </div>
+</div>
+
 
           <form onSubmit={handleSubmit}>
             {/* Step 1: Item Details */}
@@ -126,7 +144,7 @@ export default function SellPage() {
                       value={formData.title}
                       onChange={handleChange}
                       placeholder="e.g. Vintage Mechanical Watch"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full px-4 py-2 text-black border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                   </div>
 
@@ -140,7 +158,7 @@ export default function SellPage() {
                       required
                       value={formData.category}
                       onChange={handleChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full px-4 py-2 text-black border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                     >
                       <option value="">Select a category</option>
                       <option value="electronics">Electronics</option>
@@ -162,7 +180,7 @@ export default function SellPage() {
                       required
                       value={formData.condition}
                       onChange={handleChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full px-4 py-2 text-black border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                     >
                       <option value="">Select condition</option>
                       <option value="new">New</option>
