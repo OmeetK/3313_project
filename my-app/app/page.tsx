@@ -53,7 +53,7 @@ export default function HomePage() {
 
       {/* Hero Section */}
       <main className="flex-grow">
-        <section className="bg-gray-50 py-12 md:py-20">
+        <section className="py-12 md:py-20">
           <div className="container mx-auto px-4">
             <div className="max-w-4xl mx-auto text-center">
               <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
