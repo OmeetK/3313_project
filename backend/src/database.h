@@ -3,7 +3,6 @@
 
 #include <string>
 #include <mutex>
-#include <vector>
 #include <memory>
 #include <pqxx/pqxx>  // Include the full header instead of forward declarations
 
@@ -18,15 +17,8 @@ public:
     // Initialize the database (create tables if they don't exist)
     bool initialize();
     
-    // User management
-    bool createUser(const std::string& username, const std::string& email, const std::string& password);
-    int authenticateUser(const std::string& username, const std::string& password);
-    
-    // Transaction management
-    int beginTransaction(const std::string& username);
-    bool executeOperation(int transId, const std::string& operation);
-    bool commitTransaction(int transId);
-    bool rollbackTransaction(int transId);
+    // Provide access to the connection
+    pqxx::connection* getConnection();
     
 private:
     std::string connection_string;
