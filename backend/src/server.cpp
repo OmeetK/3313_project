@@ -12,7 +12,7 @@
 #include <fstream>
 #include "database.h"
 #include "user.h"
-
+#include "auction.h"
 // Platform-specific socket headers
 #ifdef _WIN32
     #include <winsock2.h>
@@ -103,6 +103,7 @@ private:
                 return "Invalid username or password.\n";
             }
         }
+
         
         // Register new user
         if (cmd == "REGISTER") {
@@ -117,8 +118,40 @@ private:
             }
         }
         // All other commands require authentication
-        if (!authenticated) {
-            return "Please login first.\n";
+        //if (!authenticated) {
+        //    return "Please login first.\n";
+        //}
+
+                // After the authentication check
+        if (cmd == "CREATE_AUCTION") {
+            int userId;
+            std::string itemName, endTime;
+            double startingPrice;
+            
+            // First try to extract the user ID from the command
+            if (!(iss >> userId)) {
+                // If no user ID provided, use default or return error
+                userId = 1;  // Default user ID for testing
+            }
+            
+            // Read the item name (quoted or unquoted)
+            if (iss.peek() == '"') {
+                iss.get(); // Skip the opening quote
+                std::getline(iss, itemName, '"');
+            } else {
+                iss >> itemName;
+            }
+            
+            // Read price and end time
+            iss >> startingPrice >> endTime;
+            
+            // Create auction with the provided user ID
+            Auction auction(database);
+            if (auction.createAuction(userId, itemName, startingPrice, endTime)) {
+                return "Auction created successfully for item: " + itemName + "\n";
+            } else {
+                return "Failed to create auction.\n";
+            }
         }
         
         // Transaction commands commented out for now

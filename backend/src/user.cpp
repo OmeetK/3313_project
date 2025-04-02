@@ -46,3 +46,24 @@ int User::authenticateUser(const std::string& username, const std::string& passw
         return -1;
     }
 }
+
+int User::getUserId(const std::string& username) {
+    try {
+        std::string query = "SELECT user_id FROM users WHERE username = '" + username + "';";
+        
+        pqxx::work txn(*database.getConnection());
+        pqxx::result result = txn.exec(query);
+        txn.commit();
+        
+        if (!result.empty()) {
+            int userId = result[0][0].as<int>();
+            return userId;
+        }
+        
+        std::cerr << "User not found: " << username << std::endl;
+        return -1;
+    } catch (const std::exception& e) {
+        std::cerr << "Error getting user ID: " << e.what() << std::endl;
+        return -1;
+    }
+}

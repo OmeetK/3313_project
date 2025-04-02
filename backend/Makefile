@@ -11,7 +11,7 @@ else
     LDLIBS = -lpqxx -lpq
 endif
 
-SRC = src/server.cpp src/database.cpp src/user.cpp
+SRC = src/server.cpp src/database.cpp src/user.cpp src/auction.cpp
 OBJ = $(SRC:.cpp=.o)
 
 all: $(TARGET)

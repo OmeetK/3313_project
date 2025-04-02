@@ -48,13 +48,21 @@ bool Database::createTablesIfNotExist() {
             ");"
         );
         executeQuery(
-            "CREATE TABLE users2 ("
-                "user_id SERIAL PRIMARY KEY,"
-                "username VARCHAR(100) NOT NULL,"
-                "email VARCHAR(100) NOT NULL UNIQUE,"
-                "password VARCHAR(255) NOT NULL"
-            ");"        
+            "CREATE TABLE IF NOT EXISTS auction ("
+            "auction_id SERIAL PRIMARY KEY,"
+            "user_id INTEGER REFERENCES users(user_id),"
+            "item_name VARCHAR(255) NOT NULL,"
+            "starting_price NUMERIC(10, 2) NOT NULL,"
+            "current_price NUMERIC(10, 2),"
+            "end_time TIMESTAMP NOT NULL,"
+            "status VARCHAR(20) DEFAULT 'active',"
+            "winner_id INTEGER REFERENCES users(user_id),"
+            "category_id INTEGER NOT NULL DEFAULT 1," // Add this line
+            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
+            "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+            ");"
         );
+        
         
         // Create Transactions table
         executeQuery(

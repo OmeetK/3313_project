@@ -9,7 +9,7 @@ public:
     User(Database& db);
     bool createUser(const std::string& username, const std::string& email, const std::string& password);
     int authenticateUser(const std::string& username, const std::string& password);
-    
+    int getUserId(const std::string& username);
 private:
     Database& database;
 };
