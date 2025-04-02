@@ -146,22 +146,6 @@ export default function AuctionDetailPage({ params }: { params: { id: string } }
                 </form>
               </div>
 
-              <div className="flex space-x-2 mb-6">
-                <button
-                  onClick={() => setIsWatching(!isWatching)}
-                  className={`flex items-center px-4 py-2 rounded-md border ${
-                    isWatching ? "bg-red-50 border-red-200 text-red-500" : "border-gray-300 text-gray-700"
-                  }`}
-                >
-                  <Heart className={`h-4 w-4 mr-2 ${isWatching ? "fill-current" : ""}`} />
-                  {isWatching ? "Watching" : "Watch"}
-                </button>
-                <button className="flex items-center px-4 py-2 rounded-md border border-gray-300 text-gray-700">
-                  <Share2 className="h-4 w-4 mr-2" />
-                  Share
-                </button>
-              </div>
-
               <div className="border-t border-gray-200 pt-4">
                 <h3 className="font-medium text-gray-900 mb-2">Seller Information</h3>
                 <div className="flex items-center">
