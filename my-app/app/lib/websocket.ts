@@ -15,7 +15,13 @@ class WebSocketService {
         };
 
         this.socket.onmessage = (event) => {
-          const data = JSON.parse(event.data);
+          let data;
+          try {
+            data = JSON.parse(event.data);
+          } catch {
+            data = { response: event.data };
+          }
+          
           console.log('WebSocket message received:', data);
           
           // Call registered callbacks
@@ -24,9 +30,8 @@ class WebSocketService {
           }
           
           // Call general message callback
-          if (this.callbacks['message']) {
+          if (this.callbacks['message']) 
             this.callbacks['message'](data);
-          }
         };
 
         this.socket.onerror = (error) => {

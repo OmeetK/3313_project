@@ -25,17 +25,31 @@ export default function LoginPage() {
     }
 
     // Listen for server responses
-    websocketService.on('server', (data) => {
+    websocketService.on('message', (data) => {
       setIsLoading(false);
-      console.log('Login response:', data);
+      console.log('EXACT DATA TYPE:', typeof data);
+      console.log('EXACT DATA VALUE:', data);
+
+      // If data is a string, not an object with a response property
+      const response = typeof data === 'string' ? data : data.response;
       
-      if (data.message.includes('Login successful')) {
-        // Store user in localStorage or a context
-        localStorage.setItem('user', formData.username);
-        // Redirect to browse page after successful login
-        router.push('/browse');
-      } else if (data.message.includes('Invalid username or password')) {
-        setError('Invalid username or password');
+      if (data.response && data.response.includes('Login successful')) {
+        // Extract token
+        const tokenPart = data.response.split('TOKEN:')[1];
+        console.log('Token part:', tokenPart);
+        
+        if (tokenPart) {
+          const token = tokenPart.trim();
+          console.log('Storing token in localStorage');
+          localStorage.setItem('token', token);
+          localStorage.setItem('user', formData.username);
+          console.log('Redirecting to /browse');
+          router.push('/browse');
+        } else {
+          console.error('Token not found in response');
+        }
+      } else {
+        console.log('Login unsuccessful or response format unexpected');
       }
     });
 
