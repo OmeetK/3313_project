@@ -19,6 +19,10 @@ public:
     
     // Provide access to the connection
     pqxx::connection* getConnection();
+
+    bool runQuery(const std::string& query) {
+        return executeQuery(query);
+    }
     
 private:
     std::string connection_string;

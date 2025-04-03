@@ -132,7 +132,7 @@ export default function AuctionDetailPage({ params }: { params: { id: string } }
                         step={auction.minBidIncrement}
                         value={bidAmount}
                         onChange={(e) => setBidAmount(Number(e.target.value))}
-                        className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                        className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-green-500 text-black"
                       />
                     </div>
                     <button
@@ -142,24 +142,8 @@ export default function AuctionDetailPage({ params }: { params: { id: string } }
                       Place Bid
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500">Enter ${auction.currentBid + auction.minBidIncrement} or more</p>
+                  <p className="text-xs text-black">Enter ${auction.currentBid + auction.minBidIncrement} or more</p>
                 </form>
-              </div>
-
-              <div className="flex space-x-2 mb-6">
-                <button
-                  onClick={() => setIsWatching(!isWatching)}
-                  className={`flex items-center px-4 py-2 rounded-md border ${
-                    isWatching ? "bg-red-50 border-red-200 text-red-500" : "border-gray-300 text-gray-700"
-                  }`}
-                >
-                  <Heart className={`h-4 w-4 mr-2 ${isWatching ? "fill-current" : ""}`} />
-                  {isWatching ? "Watching" : "Watch"}
-                </button>
-                <button className="flex items-center px-4 py-2 rounded-md border border-gray-300 text-gray-700">
-                  <Share2 className="h-4 w-4 mr-2" />
-                  Share
-                </button>
               </div>
 
               <div className="border-t border-gray-200 pt-4">

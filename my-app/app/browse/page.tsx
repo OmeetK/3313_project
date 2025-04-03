@@ -354,7 +354,7 @@ export default function BrowsePage() {
               <h3 className="font-medium text-gray-900 mb-3">Price Range</h3>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label htmlFor="min" className="block text-xs text-gray-500 mb-1">
+                  <label htmlFor="min" className="block text-xs text-black-500 mb-1">
                     Min ($)
                   </label>
                   <input
@@ -365,11 +365,11 @@ export default function BrowsePage() {
                     value={priceRange.min}
                     onChange={handlePriceChange}
                     placeholder="Min"
-                    className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-3 py-1 text-black border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
                 <div>
-                  <label htmlFor="max" className="block text-xs text-gray-500 mb-1">
+                  <label htmlFor="max" className="block text-xs text-black-500 mb-1">
                     Max ($)
                   </label>
                   <input
@@ -380,7 +380,7 @@ export default function BrowsePage() {
                     value={priceRange.max}
                     onChange={handlePriceChange}
                     placeholder="Max"
-                    className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-3 py-1 text-black border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
               </div>
@@ -391,7 +391,7 @@ export default function BrowsePage() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full px-3 py-2 text-black border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
               >
                 <option value="ending-soon">Ending Soon</option>
                 <option value="price-low">Price: Low to High</option>

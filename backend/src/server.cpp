@@ -13,6 +13,7 @@
 #include "database.h"
 #include "user.h"
 #include "auction.h"
+#include "sell.h"
 // Platform-specific socket headers
 #ifdef _WIN32
     #include <winsock2.h>
@@ -159,7 +160,49 @@ private:
                 return "Failed to create auction.\n";
             }
         }
-        
+
+        // In ClientSession::processCommand method
+        if (cmd == "CREATE_LISTING") {
+            // Parse the input: CREATE_LISTING userId itemName startingPrice endTime categoryId
+            std::string userId, itemName, startingPrice, endTime, categoryId;
+            iss >> userId >> itemName;
+            
+            // Read the rest of the line as item name if it contains spaces
+            std::string temp;
+            if (iss >> temp) {
+                itemName += " " + temp;
+                while (iss >> temp && temp.find('$') == std::string::npos) {
+                    itemName += " " + temp;
+                }
+                // Temp now should contain the price with $ prefix
+                startingPrice = temp.substr(1); // Remove $ sign
+                iss >> endTime >> categoryId;
+            }
+            
+            // Ensure we have the required parameters
+            if (userId.empty() || itemName.empty() || startingPrice.empty()) {
+                return "Error: Missing parameters. Usage: CREATE_LISTING userId itemName $startingPrice [endTime] [categoryId]";
+            }
+            
+            int userIdInt = std::stoi(userId);
+            double startingPriceDouble = std::stod(startingPrice);
+            int categoryIdInt = categoryId.empty() ? 1 : std::stoi(categoryId);
+            
+            // Create the sell manager if not initialized
+            static Auction auctionManager(database);
+            static Sell sellManager(database, auctionManager);
+                        
+            // Create the listing
+            bool success = sellManager.createListing(userIdInt, itemName, startingPriceDouble, 
+                                                endTime, categoryIdInt);
+            
+            if (success) {
+                return "Listing created successfully!";
+            } else {
+                return "Failed to create listing.";
+            }
+        }
+            
         // Transaction commands commented out for now
         // if (cmd == "BEGIN") {
         //     if (currentTransaction != -1) {
