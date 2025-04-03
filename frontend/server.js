@@ -45,7 +45,7 @@ wss.on('connection', (ws) => {
         console.log('Received response from C++ server:', data.toString());
         ws.send(JSON.stringify({
             type: 'server',
-            message: data.toString()
+            response: data.toString()  // Change "message" to "response"
         }));
         
         // Add to buffer
@@ -60,7 +60,7 @@ wss.on('connection', (ws) => {
             if (message.trim()) {
                 ws.send(JSON.stringify({
                     type: 'server',
-                    message: message.trim()
+                    response: message.trim()
                 }));
             }
         }

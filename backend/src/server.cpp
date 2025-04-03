@@ -78,6 +78,7 @@ private:
     bool authenticated;
     bool running;
     std::string username;
+    int userId = -1;  // Add this line
     int currentTransaction = -1;
     
     std::string processCommand(const std::string& command) {
@@ -93,13 +94,18 @@ private:
         if (cmd == "LOGIN") {
             std::string username, password;
             iss >> username >> password;
-        
+            
             User user(database);
             int userId = user.authenticateUser(username, password);
+            
             if (userId != -1) {
-                this->authenticated = true;
+                authenticated = true;
                 this->username = username;
-                return "Login successful!\n";
+                this->userId = userId;
+                
+                // Generate JWT token
+                std::string token = user.generateJWT(userId, username);
+                return "Login successful! TOKEN:" + token;
             } else {
                 return "Invalid username or password.\n";
             }
