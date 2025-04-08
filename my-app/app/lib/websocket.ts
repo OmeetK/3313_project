@@ -1,19 +1,24 @@
+// my-app/app/lib/websocket.ts
+
 class WebSocketService {
   private socket: WebSocket | null = null;
   private connected = false;
-  private callbacks: {[key: string]: (data: any) => void} = {};
+  private callbacks: { [key: string]: (data: any) => void } = {};
 
+  // Connect only once; subsequent calls return the existing connection.
   connect(url: string = 'ws://localhost:4000'): Promise<boolean> {
     return new Promise((resolve, reject) => {
+      if (this.isConnected()) {
+        resolve(true);
+        return;
+      }
       try {
         this.socket = new WebSocket(url);
-
         this.socket.onopen = () => {
           console.log('WebSocket connected');
           this.connected = true;
           resolve(true);
         };
-
         this.socket.onmessage = (event) => {
           let data;
           try {
@@ -21,24 +26,18 @@ class WebSocketService {
           } catch {
             data = { response: event.data };
           }
-          
           console.log('WebSocket message received:', data);
-          
-          // Call registered callbacks
           if (data.type && this.callbacks[data.type]) {
             this.callbacks[data.type](data);
           }
-          
-          // Call general message callback
-          if (this.callbacks['message']) 
+          if (this.callbacks['message']) {
             this.callbacks['message'](data);
+          }
         };
-
         this.socket.onerror = (error) => {
           console.error('WebSocket error:', error);
           reject(error);
         };
-
         this.socket.onclose = () => {
           console.log('WebSocket disconnected');
           this.connected = false;
@@ -51,19 +50,21 @@ class WebSocketService {
   }
 
   isConnected(): boolean {
-    return this.connected && this.socket !== null && this.socket.readyState === WebSocket.OPEN;
+    return (
+      this.connected &&
+      this.socket !== null &&
+      this.socket.readyState === WebSocket.OPEN
+    );
   }
 
   sendCommand(command: string): void {
     if (!this.isConnected()) {
       throw new Error('WebSocket is not connected');
     }
-
     const message = {
       type: 'command',
-      command: command
+      command: command,
     };
-
     this.socket?.send(JSON.stringify(message));
   }
 
@@ -80,6 +81,5 @@ class WebSocketService {
   }
 }
 
-// Create a singleton instance
 const websocketService = new WebSocketService();
 export default websocketService;
