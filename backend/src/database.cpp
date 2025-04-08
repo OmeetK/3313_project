@@ -2,6 +2,7 @@
 #include <pqxx/pqxx>
 #include <iostream>
 #include <sstream>
+#include <mutex>
 
 Database::Database(const std::string& connection_string) 
     : connection_string(connection_string) {
@@ -93,6 +94,7 @@ bool Database::createTablesIfNotExist() {
 }
 
 bool Database::executeQuery(const std::string& query) {
+    std::lock_guard<std::mutex> lock(db_mutex); // Lock the mutex
     try {
         if (!conn || !conn->is_open()) {
             std::cerr << "Database connection lost. Attempting to reconnect..." << std::endl;
@@ -112,5 +114,6 @@ bool Database::executeQuery(const std::string& query) {
         std::cerr << "Query execution error: " << e.what() << std::endl;
         return false;
     }
+    // lock_guard automatically releases the mutex when it goes out of scope
 }
 
