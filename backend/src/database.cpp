@@ -1,3 +1,5 @@
+// database.cpp
+
 #include "database.h"
 #include <pqxx/pqxx>
 #include <iostream>
@@ -113,4 +115,3 @@ bool Database::executeQuery(const std::string& query) {
         return false;
     }
 }
-
