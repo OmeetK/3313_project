@@ -2,12 +2,18 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { ArrowLeft, Upload, Info, HelpCircle } from "lucide-react"
+import websocketService from '../lib/websocket'
+import { useRouter } from "next/navigation"
+
+
 
 export default function SellPage() {
+  const router = useRouter();
+
   const [images, setImages] = useState<string[]>([])
   const [formData, setFormData] = useState({
     title: "",
@@ -20,6 +26,15 @@ export default function SellPage() {
     shippingOption: "seller",
   })
   const [currentStep, setCurrentStep] = useState(1)
+  const [submitting, setSubmitting] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{
+    type: 'success' | 'error' | null;
+    message: string | null;
+  }>({
+    type: null,
+    message: null
+  });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -30,23 +45,50 @@ export default function SellPage() {
   }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      // In a real app, you would upload to a server/blob storage
-      // Here we're just creating local URLs for preview
-      const newImages = Array.from(e.target.files).map((file) => URL.createObjectURL(file))
-      setImages((prev) => [...prev, ...newImages])
-    }
-  }
+    if (!e.target.files || e.target.files.length === 0) return;
+  
+    const file = e.target.files[0];
+    const reader = new FileReader();
+  
+    reader.onloadend = async () => {
+      try {
+
+        setUploadingImage(true);
+
+        const base64Data = (reader.result as string).split(',')[1]; // Remove data:image/...;base64, part
+  
+        const res = await fetch("/api/upload-imgur", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            imageBase64: base64Data,
+          }),
+        });
+    
+        const data = await res.json();
+  
+        if (data.success) {
+          const imageUrl = data.data.link;
+          console.log("Imgur URL:", imageUrl);
+          setImages([imageUrl]); // Save URL to be used in WebSocket command
+        } else {
+          console.error("Imgur upload failed:", data);
+        }
+      } catch (err) {
+        console.error("Image upload error:", err);
+      } finally {
+        setUploadingImage(false);
+      }
+    };
+  
+    reader.readAsDataURL(file);
+  };
+  
 
   const removeImage = (index: number) => {
     setImages((prev) => prev.filter((_, i) => i !== index))
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    // Here you would connect to your C server to create the auction
-    console.log("Creating auction with:", { ...formData, images })
-    alert("Your item has been listed for auction! In a real app, this would connect to your C server.")
   }
 
   const nextStep = () => {
@@ -56,6 +98,101 @@ export default function SellPage() {
   const prevStep = () => {
     setCurrentStep((prev) => Math.max(prev - 1, 1))
   }
+
+  useEffect(() => {
+    if (!websocketService.isConnected()) {
+      websocketService.connect()
+        .catch(error => {
+          setStatusMessage({
+            type: 'error',
+            message: 'Could not connect to server'
+          });
+        });
+    }
+
+    // Set up event handlers
+    websocketService.on('server', (data) => {
+      // Handle successful listing creation
+      if (data.response && data.response.includes('Listing created successfully')) {
+        setSubmitting(false);
+        setStatusMessage({
+          type: 'success',
+          message: 'Your item has been successfully listed for auction!'
+        });
+
+        setTimeout(() => {
+          router.push("/browse");
+        }, 2000);
+      } 
+      // Handle failure
+      else if (data.response && data.response.includes('Failed to create listing')) {
+        setSubmitting(false);
+        setStatusMessage({
+          type: 'error',
+          message: 'Failed to create listing. Please try again.'
+        });
+      }
+    });
+
+    websocketService.on('error', (data) => {
+      setSubmitting(false);
+      setStatusMessage({
+        type: 'error',
+        message: data.message || 'An error occurred'
+      });
+    });
+
+    return () => {
+      // No need to disconnect on component unmount
+      // The service is meant to be persistent
+    };
+  }, []);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+
+    // Map category string to ID
+    const categoryMapping: Record<string, number> = {
+      "electronics": 2,
+      "fashion": 3,
+      "watches": 4,
+      "collectibles": 5,
+      "home": 6,
+      "cameras": 7,
+      "": 1 // Default category
+    };
+
+    const categoryId = categoryMapping[formData.category] || 1;
+
+    // Calculate end date
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + parseInt(formData.duration));
+    const formattedEndDate = `"${endDate.toISOString().replace('T', ' ').split('.')[0]}"`;  // wrap in quotes
+
+    try {
+      // Send command to create listing
+      // CREATE_LISTING userId itemName $startingPrice endTime categoryId
+      const itemNameForCommand = formData.title.includes(' ') ? 
+      formData.title : // Already has a space
+      formData.title + " __SINGLE_WORD_MARKER__"; // Add a placeholder second word
+    
+      console.log("Image to be sent:", images[0]); // <- add this to verify the image is in state
+
+      const token = localStorage.getItem("token");
+      const imageUrl = images[0] || "";
+      const command = `CREATE_LISTING_TOKEN ${token} ${itemNameForCommand} $${formData.startingPrice} ${formattedEndDate} ${categoryId} "${imageUrl}"`;
+      websocketService.sendCommand(command);
+      console.log("Sent listing creation command:", command);
+    } catch (error) {
+      console.error("Error sending command:", error);
+      setSubmitting(false);
+      setStatusMessage({
+        type: 'error',
+        message: 'Failed to connect to server. Please try again.'
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -229,7 +366,7 @@ export default function SellPage() {
                   {images.length > 0 && (
                     <div className="mt-4 grid grid-cols-4 gap-4">
                       {images.map((img, index) => (
-                        <div key={index} className="relative">
+                        <div key={index} className="relative w-24 h-24">
                           <Image
                             src={img || "/placeholder.svg"}
                             alt={`Item image ${index + 1}`}
@@ -240,12 +377,21 @@ export default function SellPage() {
                           <button
                             type="button"
                             onClick={() => removeImage(index)}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
-                          >
+                            className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm shadow-md"
+                            >
                             ×
                           </button>
                         </div>
                       ))}
+                    </div>
+                  )}
+                  {uploadingImage && (
+                    <div className="mt-4 flex justify-center items-center">
+                      <svg className="animate-spin h-6 w-6 text-green-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                      </svg>
+                      <span className="ml-2 text-sm text-gray-600">Uploading image...</span>
                     </div>
                   )}
                 </div>
@@ -262,7 +408,7 @@ export default function SellPage() {
                     onChange={handleChange}
                     rows={6}
                     placeholder="Describe your item in detail. Include information about brand, model, size, color, condition, authenticity, etc."
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-4 py-2 text-black border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                   ></textarea>
                   <p className="text-xs text-gray-500 mt-1">
                     Minimum 50 characters. Detailed descriptions help your item sell faster.
@@ -308,7 +454,7 @@ export default function SellPage() {
                         value={formData.startingPrice}
                         onChange={handleChange}
                         placeholder="0.00"
-                        className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                        className="w-full pl-8 pr-4 py-2 text-black border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                       />
                     </div>
                     <p className="text-xs text-gray-500 mt-1">This is the minimum bid for your auction</p>
@@ -329,7 +475,7 @@ export default function SellPage() {
                         value={formData.reservePrice}
                         onChange={handleChange}
                         placeholder="0.00"
-                        className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                        className="w-full pl-8 pr-4 py-2 text-black border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                       />
                     </div>
                     <div className="flex items-start mt-1">
@@ -351,7 +497,7 @@ export default function SellPage() {
                       required
                       value={formData.duration}
                       onChange={handleChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full px-4 py-2 text-black border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                     >
                       <option value="3">3 days</option>
                       <option value="5">5 days</option>
@@ -371,7 +517,7 @@ export default function SellPage() {
                       required
                       value={formData.shippingOption}
                       onChange={handleChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full px-4 py-2 text-black border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                     >
                       <option value="seller">Seller pays shipping</option>
                       <option value="buyer">Buyer pays shipping</option>
@@ -412,6 +558,33 @@ export default function SellPage() {
           </form>
         </div>
       </div>
+
+      {/* Loading overlay */}
+      {submitting && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg">
+            <p className="text-lg">Creating your listing...</p>
+          </div>
+        </div>
+      )}
+      
+      {/* Status message overlay */}
+      {statusMessage.type && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md">
+            <h3 className={`text-xl font-bold ${statusMessage.type === 'success' ? 'text-green-600' : 'text-red-600'} mb-4`}>
+              {statusMessage.type === 'success' ? 'Success!' : 'Error'}
+            </h3>
+            <p className="mb-4 text-black">{statusMessage.message}</p>
+            <button
+              onClick={() => router.push("/browse")}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Go to Browse
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

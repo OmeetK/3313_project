@@ -164,6 +164,179 @@ private:
         }
 
         if (cmd == "CREATE_LISTING") {
+
+            std::string itemName, startingPrice, endTime;
+            int categoryIdInt = 1;
+        
+            // Step 1: User ID
+            if (!authenticated || userId == -1) {
+                return "Error: You must be logged in to create a listing.";
+            }
+
+            // Step 2: Item name until we hit $startingPrice
+            std::string word;
+            while (iss >> word) {
+                if (!word.empty() && word[0] == '$') {
+                    startingPrice = word.substr(1); // Strip the $
+                    break;
+                }
+                if (!itemName.empty()) itemName += " ";
+                itemName += word;
+            }
+        
+            if (startingPrice.empty()) {
+                return "Error: Missing price.";
+            }
+        
+            // Step 3: Extract full quoted end time
+            std::getline(iss, word, '"'); // discard whitespace before quote
+            std::getline(iss, endTime, '"');
+        
+            // Step 4: Extract category ID
+            iss >> categoryIdInt;
+        
+            // Debug
+            std::cout << "Parsed Listing -> userId: " << userId
+              << ", item: " << itemName
+              << ", price: " << startingPrice
+              << ", endTime: " << endTime
+              << ", category: " << categoryIdInt << std::endl;
+        
+            double startingPriceDouble = std::stod(startingPrice);
+        
+            static Auction auctionManager(database);
+            static Sell sellManager(database, auctionManager);
+        
+            bool success = sellManager.createListing(userId, itemName, startingPriceDouble, endTime, categoryIdInt);
+            return success ? "Listing created successfully!" : "Failed to create listing.";
+        }
+
+
+        if (cmd == "CREATE_LISTING_TOKEN") {
+            std::string token, itemName, startingPrice, endTime;
+            int categoryIdInt = 1;
+        
+            // Step 1: Extract token
+            if (!(iss >> token)) {
+                return "Error: Missing token.";
+            }
+        
+            // Step 2: Validate token and extract user ID
+            int extractedUserId = -1;
+            User user(database);
+            if (!user.validateJWT(token, extractedUserId)) {
+                return "Error: Invalid or expired token.";
+            }
+        
+            // Step 3: Parse item name until $price
+            std::string word;
+            while (iss >> word) {
+                if (!word.empty() && word[0] == '$') {
+                    startingPrice = word.substr(1); // remove $
+                    break;
+                }
+                if (!itemName.empty()) itemName += " ";
+                itemName += word;
+            }
+        
+            if (startingPrice.empty()) {
+                return "Error: Missing price.";
+            }
+        
+            // Step 4: Read quoted time and category ID
+            std::getline(iss, word, '"'); // discard leading space
+            std::getline(iss, endTime, '"');
+            iss >> categoryIdInt;
+
+            std::string imageUrl;
+            iss >> std::ws;
+            if (iss.peek() == '"') {
+                iss.get(); // skip opening quote
+                std::getline(iss, imageUrl, '"');
+            }
+        
+            std::cout << "Parsed Listing -> userId: " << extractedUserId
+            << ", item: " << itemName
+            << ", price: " << startingPrice
+            << ", endTime: " << endTime
+            << ", category: " << categoryIdInt
+            << ", image=" << imageUrl << std::endl;
+  
+        
+            double startingPriceDouble = std::stod(startingPrice);
+        
+            static Auction auctionManager(database);
+            static Sell sellManager(database, auctionManager);
+        
+            bool success = sellManager.createListing(extractedUserId, itemName, startingPriceDouble, endTime, categoryIdInt, imageUrl);
+        
+            return success ? "Listing created successfully!" : "Failed to create listing.";
+        }
+        
+        
+        
+        
+            
+        // Transaction commands commented out for now
+        // if (cmd == "BEGIN") {
+        //     if (currentTransaction != -1) {
+        //         return "You already have an active transaction.\n";
+        //     }
+            
+        //     currentTransaction = database.beginTransaction(username);
+        //     if (currentTransaction != -1) {
+        //         return "Transaction " + std::to_string(currentTransaction) + " started.\n";
+        //     } else {
+        //         return "Failed to start transaction.\n";
+        //     }
+        // }
+        
+        // if (cmd == "EXECUTE") {
+        //     if (currentTransaction == -1) {
+        //         return "No active transaction. Begin one with BEGIN command.\n";
+        //     }
+            
+        //     std::string operation;
+        //     std::getline(iss, operation);
+        //     operation = operation.substr(operation.find_first_not_of(" \t")); // Trim leading whitespace
+            
+        //     if (database.executeOperation(currentTransaction, operation)) {
+        //         return "Operation executed successfully.\n";
+        //     } else {
+        //         return "Operation failed!\n";
+        //     }
+        // }
+        
+        // if (cmd == "COMMIT") {
+        //     if (currentTransaction == -1) {
+        //         return "No active transaction to commit.\n";
+        //     }
+            
+        //     int transId = currentTransaction;
+        //     currentTransaction = -1;
+            
+        //     if (database.commitTransaction(transId)) {
+        //         return "Transaction " + std::to_string(transId) + " committed successfully.\n";
+        //     } else {
+        //         return "Failed to commit transaction " + std::to_string(transId) + ".\n";
+        //     }
+        // }
+        
+        // if (cmd == "ROLLBACK") {
+        //     if (currentTransaction == -1) {
+        //         return "No active transaction to rollback.\n";
+        //     }
+            
+        //     int transId = currentTransaction;
+        //     currentTransaction = -1;
+            
+        //     if (database.rollbackTransaction(transId)) {
+        //         return "Transaction " + std::to_string(transId) + " rolled back.\n";
+        //     } else {
+        //         return "Failed to rollback transaction " + std::to_string(transId) + ".\n";
+        //     }
+        // }
+        
             return "Not implemented in this snippet.\n";
         }
 
@@ -235,6 +408,7 @@ private:
             bool success = auction.placeBid(auctionId, userId, bidAmount, err);
             return success ? "Bid placed successfully.\n" : ("Bid failed: " + err + "\n");
         }
+
 
         if (cmd == "EXIT" || cmd == "QUIT") {
             running = false;
