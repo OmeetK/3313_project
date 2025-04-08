@@ -65,6 +65,16 @@ bool Database::createTablesIfNotExist() {
             "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
             ");"
         );
+
+        executeQuery(
+            "CREATE TABLE IF NOT EXISTS bids ("
+            "bid_id SERIAL PRIMARY KEY,"
+            "auction_id INTEGER REFERENCES auction(auction_id),"
+            "bidder_id INTEGER REFERENCES users(user_id),"
+            "bid_amount NUMERIC(10, 2) NOT NULL,"
+            "bid_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+            ");"
+        );
         
         
         // Create Transactions table
