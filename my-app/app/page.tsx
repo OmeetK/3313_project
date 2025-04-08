@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Search, Bell, User } from "lucide-react"
+import { Search, User } from "lucide-react"
 
 export default function HomePage() {
   return (
@@ -33,9 +33,6 @@ export default function HomePage() {
               </div>
 
               <div className="flex items-center space-x-4">
-                <button className="text-gray-700 hover:text-green-500">
-                  <Bell className="h-6 w-6" />
-                </button>
                 <Link href="/profile" className="text-gray-700 hover:text-green-500">
                   <User className="h-6 w-6" />
                 </Link>

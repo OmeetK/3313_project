@@ -85,8 +85,13 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-        <h1 className="text-2xl font-bold mb-4">Login</h1>
-        
+        <h1 className="text-2xl font-bold mb-4 text-black">Login</h1>
+            <button
+            onClick={() => router.push("/")}
+            className="mb-4 text-sm text-green-600 hover:underline"
+          >
+            ← Back to Home
+          </button>
         {error && (
           <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
             {error}
@@ -95,7 +100,7 @@ export default function LoginPage() {
         
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
-            <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="username" className="block text-sm font-medium text-black">
               Username
             </label>
             <input
@@ -104,14 +109,14 @@ export default function LoginPage() {
               name="username"
               value={formData.username}
               onChange={handleChange}
-              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+              className="text-sm w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 text-black"
               placeholder="Enter your username"
               required
             />
           </div>
           
           <div className="mb-6">
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="password" className="block text-sm font-medium text-black">
               Password
             </label>
             <input
@@ -120,7 +125,7 @@ export default function LoginPage() {
               name="password"
               value={formData.password}
               onChange={handleChange}
-              className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+              className="text-sm w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 text-black"
               placeholder="Enter your password"
               required
             />

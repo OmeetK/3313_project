@@ -262,6 +262,25 @@ private:
         //         return "Failed to rollback transaction " + std::to_string(transId) + ".\n";
         //     }
         // }
+        if (cmd == "GET_MY_LISTINGS") {
+            if (!authenticated) return "Please login first.\n";
+        
+            pqxx::work txn(*database.getConnection());
+            std::string query = "SELECT auction_id, item_name, current_price, end_time, status FROM auction WHERE user_id = " + std::to_string(userId);
+            pqxx::result result = txn.exec(query);
+            txn.commit();
+        
+            std::ostringstream response;
+            for (const auto& row : result) {
+                response << row["auction_id"].as<int>() << "|"
+                         << row["item_name"].as<std::string>() << "|"
+                         << row["current_price"].as<double>() << "|"
+                         << row["end_time"].as<std::string>() << "|"
+                         << row["status"].as<std::string>() << "\n";
+            }
+        
+            return response.str();
+        }
         
         if (cmd == "EXIT" || cmd == "QUIT") {
             running = false;

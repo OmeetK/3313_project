@@ -5,6 +5,7 @@
 #include "database.h"
 #include <string>
 #include <jwt/jwt.hpp>
+#include <jwt/jwt.hpp>
 
 class User {
 public:
