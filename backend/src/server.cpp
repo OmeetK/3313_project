@@ -163,45 +163,117 @@ private:
 
         // In ClientSession::processCommand method
         if (cmd == "CREATE_LISTING") {
-            // Parse the input: CREATE_LISTING userId itemName startingPrice endTime categoryId
-            std::string userId, itemName, startingPrice, endTime, categoryId;
-            iss >> userId >> itemName;
-            
-            // Read the rest of the line as item name if it contains spaces
-            std::string temp;
-            if (iss >> temp) {
-                itemName += " " + temp;
-                while (iss >> temp && temp.find('$') == std::string::npos) {
-                    itemName += " " + temp;
+            std::string itemName, startingPrice, endTime;
+            int categoryIdInt = 1;
+        
+            // Step 1: User ID
+            if (!authenticated || userId == -1) {
+                return "Error: You must be logged in to create a listing.";
+            }
+
+            // Step 2: Item name until we hit $startingPrice
+            std::string word;
+            while (iss >> word) {
+                if (!word.empty() && word[0] == '$') {
+                    startingPrice = word.substr(1); // Strip the $
+                    break;
                 }
-                // Temp now should contain the price with $ prefix
-                startingPrice = temp.substr(1); // Remove $ sign
-                iss >> endTime >> categoryId;
+                if (!itemName.empty()) itemName += " ";
+                itemName += word;
             }
-            
-            // Ensure we have the required parameters
-            if (userId.empty() || itemName.empty() || startingPrice.empty()) {
-                return "Error: Missing parameters. Usage: CREATE_LISTING userId itemName $startingPrice [endTime] [categoryId]";
+        
+            if (startingPrice.empty()) {
+                return "Error: Missing price.";
             }
-            
-            int userIdInt = std::stoi(userId);
+        
+            // Step 3: Extract full quoted end time
+            std::getline(iss, word, '"'); // discard whitespace before quote
+            std::getline(iss, endTime, '"');
+        
+            // Step 4: Extract category ID
+            iss >> categoryIdInt;
+        
+            // Debug
+            std::cout << "Parsed Listing -> userId: " << userId
+              << ", item: " << itemName
+              << ", price: " << startingPrice
+              << ", endTime: " << endTime
+              << ", category: " << categoryIdInt << std::endl;
+        
             double startingPriceDouble = std::stod(startingPrice);
-            int categoryIdInt = categoryId.empty() ? 1 : std::stoi(categoryId);
-            
-            // Create the sell manager if not initialized
+        
             static Auction auctionManager(database);
             static Sell sellManager(database, auctionManager);
-                        
-            // Create the listing
-            bool success = sellManager.createListing(userIdInt, itemName, startingPriceDouble, 
-                                                endTime, categoryIdInt);
-            
-            if (success) {
-                return "Listing created successfully!";
-            } else {
-                return "Failed to create listing.";
-            }
+        
+            bool success = sellManager.createListing(userId, itemName, startingPriceDouble, endTime, categoryIdInt);
+            return success ? "Listing created successfully!" : "Failed to create listing.";
         }
+
+
+        if (cmd == "CREATE_LISTING_TOKEN") {
+            std::string token, itemName, startingPrice, endTime;
+            int categoryIdInt = 1;
+        
+            // Step 1: Extract token
+            if (!(iss >> token)) {
+                return "Error: Missing token.";
+            }
+        
+            // Step 2: Validate token and extract user ID
+            int extractedUserId = -1;
+            User user(database);
+            if (!user.validateJWT(token, extractedUserId)) {
+                return "Error: Invalid or expired token.";
+            }
+        
+            // Step 3: Parse item name until $price
+            std::string word;
+            while (iss >> word) {
+                if (!word.empty() && word[0] == '$') {
+                    startingPrice = word.substr(1); // remove $
+                    break;
+                }
+                if (!itemName.empty()) itemName += " ";
+                itemName += word;
+            }
+        
+            if (startingPrice.empty()) {
+                return "Error: Missing price.";
+            }
+        
+            // Step 4: Read quoted time and category ID
+            std::getline(iss, word, '"'); // discard leading space
+            std::getline(iss, endTime, '"');
+            iss >> categoryIdInt;
+
+            std::string imageUrl;
+            iss >> std::ws;
+            if (iss.peek() == '"') {
+                iss.get(); // skip opening quote
+                std::getline(iss, imageUrl, '"');
+            }
+        
+            std::cout << "Parsed Listing -> userId: " << extractedUserId
+            << ", item: " << itemName
+            << ", price: " << startingPrice
+            << ", endTime: " << endTime
+            << ", category: " << categoryIdInt
+            << ", image=" << imageUrl << std::endl;
+  
+        
+            double startingPriceDouble = std::stod(startingPrice);
+        
+            static Auction auctionManager(database);
+            static Sell sellManager(database, auctionManager);
+        
+            bool success = sellManager.createListing(extractedUserId, itemName, startingPriceDouble, endTime, categoryIdInt, imageUrl);
+        
+            return success ? "Listing created successfully!" : "Failed to create listing.";
+        }
+        
+        
+        
+        
             
         // Transaction commands commented out for now
         // if (cmd == "BEGIN") {
