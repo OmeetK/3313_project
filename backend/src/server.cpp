@@ -337,8 +337,8 @@ private:
         //     }
         // }
         
-            return "Not implemented in this snippet.\n";
-        }
+          //  return "Not implemented in this snippet.\n";
+        //}
 
         // GET_ALL_AUCTIONS: Build JSON response with escaped strings.
         if (cmd == "GET_ALL_AUCTIONS") {
