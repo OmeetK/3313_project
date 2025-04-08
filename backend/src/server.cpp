@@ -38,6 +38,24 @@
 // Database instance
 std::unique_ptr<Database> g_db;
 
+// Helper function to escape JSON strings
+std::string escapeJsonString(const std::string& input) {
+    std::ostringstream ss;
+    for (auto c = input.cbegin(); c != input.cend(); c++) {
+        switch (*c) {
+            case '"': ss << "\\\""; break;
+            case '\\': ss << "\\\\"; break;
+            case '\b': ss << "\\b"; break;
+            case '\f': ss << "\\f"; break;
+            case '\n': ss << "\\n"; break;
+            case '\r': ss << "\\r"; break;
+            case '\t': ss << "\\t"; break;
+            default: ss << *c; break;
+        }
+    }
+    return ss.str();
+}
+
 // Session for each connected client
 class ClientSession {
 public:
@@ -90,7 +108,113 @@ private:
         for (auto& c : cmd) {
             c = toupper(c);
         }
-        
+
+        if (cmd == "GET_AUCTIONS") {
+            Auction auction(database);
+            std::vector<std::tuple<int, std::string, double, std::string>> auctions;
+            
+            if (auction.getAllAuctions(auctions)) {
+                std::stringstream jsonResponse;
+                jsonResponse << "{\"action\":\"AUCTIONS_LIST\",\"auctions\":[";
+                
+                bool first = true;
+                for (const auto& item : auctions) {
+                    if (!first) jsonResponse << ",";
+                    
+                    int auctionId = std::get<0>(item);
+                    std::string title = std::get<1>(item);
+                    double currentBid = std::get<2>(item);
+                    std::string endTime = std::get<3>(item);
+                    
+                    // Get category info
+                    std::string query = "SELECT category_id FROM auction WHERE auction_id = " + std::to_string(auctionId);
+                    pqxx::work txn(*database.getConnection());
+                    pqxx::result result = txn.exec(query);
+                    txn.commit();
+                    
+                    // Get category name from category table
+                    std::string categoryName = "other";
+                    if (!result.empty()) {
+                        int categoryId = result[0]["category_id"].as<int>();
+                        
+                        // Query the category table to get the category name
+                        pqxx::work categoryTxn(*database.getConnection());
+                        pqxx::result categoryResult = categoryTxn.exec(
+                            "SELECT category_name FROM category WHERE category_id = " + std::to_string(categoryId)
+                        );
+                        categoryTxn.commit();
+                        
+                        if (!categoryResult.empty()) {
+                            categoryName = categoryResult[0]["category_name"].as<std::string>();
+                        }
+                    }
+                    
+                    // Get bid count
+                    query = "SELECT COUNT(*) as bid_count FROM bids WHERE auction_id = " + std::to_string(auctionId);
+                    pqxx::work txn2(*database.getConnection());
+                    pqxx::result bidResult = txn2.exec(query);
+                    txn2.commit();
+                    
+                    int bidCount = 0;
+                    if (!bidResult.empty()) {
+                        bidCount = bidResult[0]["bid_count"].as<int>();
+                    }
+                    
+                    // Get image URL
+                    query = "SELECT image_url FROM auction WHERE auction_id = " + std::to_string(auctionId);
+                    pqxx::work txn4(*database.getConnection());
+                    pqxx::result imageResult = txn4.exec(query);
+                    txn4.commit();
+                    
+                    std::string imageUrl = "";
+                    if (!imageResult.empty() && !imageResult[0]["image_url"].is_null()) {
+                        imageUrl = imageResult[0]["image_url"].as<std::string>();
+                    }
+                    
+                    // Determine condition based on current price vs starting price
+                    query = "SELECT starting_price, current_price FROM auction WHERE auction_id = " + std::to_string(auctionId);
+                    pqxx::work txn3(*database.getConnection());
+                    pqxx::result priceResult = txn3.exec(query);
+                    txn3.commit();
+                    
+                    std::string condition = "good";
+                    if (!priceResult.empty()) {
+                        double startingPrice = priceResult[0]["starting_price"].as<double>();
+                        double currentPrice = priceResult[0]["current_price"].as<double>();
+                        double ratio = startingPrice > 0 ? currentPrice / startingPrice : 1.0;
+                        
+                        if (ratio > 1.5) condition = "excellent";
+                        else if (ratio > 1.25) condition = "good";
+                        else if (ratio > 1.1) condition = "fair";
+                        else condition = "new";
+                    }
+                    
+                    jsonResponse << "{";
+                    jsonResponse << "\"id\":" << auctionId << ",";
+                    jsonResponse << "\"title\":\"" << escapeJsonString(title) << "\",";
+                    jsonResponse << "\"current_bid\":" << currentBid << ",";
+                    jsonResponse << "\"end_time\":\"" << escapeJsonString(endTime) << "\",";
+                    jsonResponse << "\"bid_count\":" << bidCount << ",";
+                    jsonResponse << "\"category\":\"" << escapeJsonString(categoryName) << "\",";
+                    jsonResponse << "\"condition\":\"" << condition << "\"";
+                    
+                    // Only add image_url if it's not empty
+                    if (!imageUrl.empty()) {
+                        jsonResponse << ",\"image_url\":\"" << escapeJsonString(imageUrl) << "\"";
+                    }
+                    
+                    jsonResponse << "}";
+                    
+                    first = false;
+                }
+                
+                jsonResponse << "]}";
+                return jsonResponse.str() + "\n";
+            } else {
+                return "{\"status\":\"error\",\"message\":\"Failed to retrieve auctions\"}\n";
+            }
+        }
+
         if (cmd == "LOGIN") {
             std::string username, password;
             iss >> username >> password;
@@ -128,6 +252,38 @@ private:
         //if (!authenticated) {
         //    return "Please login first.\n";
         //}
+
+        
+        if (cmd == "PLACE_BID") {
+            // This command requires authentication
+            if (!authenticated) {
+                return "{\"status\":\"error\",\"message\":\"Please login to place a bid\"}\n";
+            }
+            
+            std::istringstream iss(command);
+            std::string cmd;
+            iss >> cmd; // Skip the first token (PLACE_BID)
+            
+            int auctionId;
+            double bidAmount;
+            
+            iss >> auctionId >> bidAmount;
+            
+            if (auctionId <= 0 || bidAmount <= 0) {
+                return "{\"status\":\"error\",\"message\":\"Invalid auction ID or bid amount\"}\n";
+            }
+            
+            // In a real implementation, you would call a method to place a bid
+            // For now, just return a success message
+            std::stringstream jsonResponse;
+            jsonResponse << "{\"action\":\"BID_UPDATE\",";
+            jsonResponse << "\"auction_id\":" << auctionId << ",";
+            jsonResponse << "\"new_bid\":" << bidAmount << ",";
+            jsonResponse << "\"user_id\":" << userId << ",";
+            jsonResponse << "\"status\":\"success\"}";
+            
+            return jsonResponse.str() + "\n";
+        }
 
                 // After the authentication check
         if (cmd == "CREATE_AUCTION") {
@@ -268,7 +424,7 @@ private:
             return "Goodbye!\n";
         }
         
-        return "Unknown command. Available commands: BEGIN, EXECUTE, COMMIT, ROLLBACK, EXIT\n";
+        return "Unknown command. Available commands: LOGIN, REGISTER, GET_AUCTIONS, PLACE_BID, CREATE_AUCTION, CREATE_LISTING, EXIT\n";
     }
 };
 
@@ -293,6 +449,23 @@ public:
             std::cerr << "Error creating socket: " << SOCKET_ERROR_CODE << std::endl;
             return false;
         }
+        
+        // Set socket options to reuse address
+        #ifdef _WIN32
+            // Windows settings
+            char opt = 1;
+            if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt, sizeof(opt)) < 0) {
+                std::cerr << "setsockopt(SO_REUSEADDR) failed: " << SOCKET_ERROR_CODE << std::endl;
+                return false;
+            }
+        #else
+            // Unix settings (Linux/macOS)
+            int opt = 1;
+            if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+                std::cerr << "setsockopt(SO_REUSEADDR) failed: " << SOCKET_ERROR_CODE << std::endl;
+                return false;
+            }
+        #endif
         
         // Set up address structure
         sockaddr_in serverAddr;

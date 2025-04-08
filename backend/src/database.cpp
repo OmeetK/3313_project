@@ -68,7 +68,7 @@ bool Database::createTablesIfNotExist() {
         executeQuery(
             "CREATE TABLE IF NOT EXISTS transactions ("
             "id SERIAL PRIMARY KEY,"
-            "user_id INTEGER REFERENCES users(id),"
+            "user_id INTEGER REFERENCES users(user_id),"
             "status VARCHAR(20) DEFAULT 'pending',"
             "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
             "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
@@ -79,7 +79,7 @@ bool Database::createTablesIfNotExist() {
         executeQuery(
             "CREATE TABLE IF NOT EXISTS operations ("
             "id SERIAL PRIMARY KEY,"
-            "transaction_id INTEGER REFERENCES transactions(id),"
+            "transaction_id INTEGER REFERENCES transactions(transaction_id),"
             "operation_data TEXT NOT NULL,"
             "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
             ");"

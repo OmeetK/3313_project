@@ -11,7 +11,7 @@ const wss = new WebSocket.Server({ server });
 
 // Configuration
 const PORT = process.env.PORT || 4000;
-const CPP_SERVER_HOST = process.env.CPP_SERVER_HOST || 'localhost';
+const CPP_SERVER_HOST = process.env.CPP_SERVER_HOST || '172.21.118.52'; // Keep your server IP
 const CPP_SERVER_PORT = process.env.CPP_SERVER_PORT || 8080;
 
 // Serve static files from the 'public' directory
@@ -20,12 +20,26 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Store active connections
 const connections = new Map();
 
+// Helper function to try parsing JSON safely
+function tryParseJSON(str) {
+    try {
+        return JSON.parse(str);
+    } catch (e) {
+        console.log('Failed to parse JSON:', str);
+        return null;
+    }
+}
+
 // WebSocket connection handler
 wss.on('connection', (ws) => {
     console.log('Client connected to WebSocket proxy server');
 
     // Create TCP connection to C++ server
     const tcpClient = new net.Socket();
+    
+    // Track last command sent and login status
+    let lastCommand = '';
+    let loggedIn = false;
     
     // Connect to C++ server
     tcpClient.connect(CPP_SERVER_PORT, CPP_SERVER_HOST, () => {
@@ -42,26 +56,97 @@ wss.on('connection', (ws) => {
     
     // Handle TCP responses from the C++ backend server
     tcpClient.on('data', (data) => {
-        console.log('Received response from C++ server:', data.toString());
-        ws.send(JSON.stringify({
-            type: 'server',
-            response: data.toString()  // Change "message" to "response"
-        }));
+        const responseData = data.toString();
+        console.log('Received raw response from C++ server:', responseData);
         
-        // Add to buffer
-        buffer += data.toString();
+        // Check if we need to auto-login for certain commands
+        if ((responseData.includes('Welcome to the') || 
+             responseData.includes('Please login with') ||
+             responseData.includes('Unknown command')) && 
+            !loggedIn) {
+            
+            // Check if the last command was a GET_AUCTIONS or similar browsing command
+            if (lastCommand && 
+                (lastCommand.includes('GET_AUCTIONS') || 
+                 lastCommand.startsWith('GET_'))) {
+                
+                console.log('Auto-logging in for testuser...');
+                tcpClient.write('LOGIN testing test123\n');
+                loggedIn = true;
+                
+                // Re-send the original command after login
+                setTimeout(() => {
+                    console.log('Re-sending command after auto-login:', lastCommand);
+                    tcpClient.write(lastCommand + '\n');
+                }, 100);
+                
+                // Don't send welcome/login message to client
+                return;
+            }
+        }
         
-        // Process complete messages (assuming messages end with newline)
-        const messages = buffer.split('\n');
-        buffer = messages.pop(); // Keep the last incomplete message in the buffer
-        
-        // Send complete messages to the WebSocket client
-        for (const message of messages) {
-            if (message.trim()) {
+        // If response contains "Login successful", update login status
+        if (responseData.includes('Login successful')) {
+            loggedIn = true;
+            
+            // Don't send login success message to client for auto-login
+            if (lastCommand && lastCommand.startsWith('LOGIN')) {
+                // This was an explicit login, send the response
                 ws.send(JSON.stringify({
                     type: 'server',
-                    response: message.trim()
+                    message: responseData
                 }));
+            }
+            return;
+        }
+        
+        // Add to buffer
+        buffer += responseData;
+        
+        // Try to parse as JSON first
+        try {
+            // If the buffer contains complete JSON, process it
+            const jsonData = JSON.parse(buffer);
+            console.log('Parsed JSON data from buffer:', jsonData);
+            
+            // Clear the buffer after successful parsing
+            buffer = '';
+            
+            // Send the parsed JSON to the client
+            ws.send(JSON.stringify({
+                type: 'server',
+                message: jsonData
+            }));
+            
+        } catch (e) {
+            // Not a complete JSON yet or not JSON format
+            console.log('Buffer is not complete JSON yet or is text format');
+            
+            // Check if we have complete messages (assuming messages end with newline)
+            const messages = buffer.split('\n');
+            if (messages.length > 1) {
+                // Keep the last potentially incomplete message in the buffer
+                buffer = messages.pop();
+                
+                // Process complete messages
+                for (const message of messages) {
+                    if (message.trim()) {
+                        // Try to parse as JSON first
+                        try {
+                            const jsonData = JSON.parse(message.trim());
+                            ws.send(JSON.stringify({
+                                type: 'server',
+                                message: jsonData
+                            }));
+                        } catch (e) {
+                            // Not JSON, send as text
+                            ws.send(JSON.stringify({
+                                type: 'server',
+                                message: message.trim()
+                            }));
+                        }
+                    }
+                }
             }
         }
     });
@@ -97,27 +182,17 @@ wss.on('connection', (ws) => {
     ws.on('message', (message) => {
         try {
             const data = JSON.parse(message);
+            console.log('Received WebSocket message:', data);
             
             if (data.type === 'command') {
-                console.log('Received command from client:', data.command);
-
-                if (tcpClient && tcpClient.writable) {
-                    // Forward the command to the C++ backend server
-                    console.log('Sending command to C++ server:', data.command);
-                    tcpClient.write(data.command + '\n');
-                } else {
-                    ws.send(JSON.stringify({
-                        type: 'error',
-                        message: 'Cannot send command: Not connected to C++ server'
-                    }));
-                }
+                const command = data.command;
+                lastCommand = command;
+                
+                console.log('Sending command to C++ server:', command);
+                tcpClient.write(command + '\n');
             }
         } catch (error) {
             console.error('Error processing WebSocket message:', error);
-            ws.send(JSON.stringify({
-                type: 'error',
-                message: 'Invalid message format'
-            }));
         }
     });
     
@@ -146,6 +221,11 @@ wss.on('connection', (ws) => {
 // Main HTML route
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', message: 'Server is running' });
 });
 
 // Start the server

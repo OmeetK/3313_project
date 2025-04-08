@@ -1,137 +1,25 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
+import Navbar from "../Navbar"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { Search, Filter, ChevronDown, Grid, List, AlertCircle, Camera } from "lucide-react"
 import Image from "next/image"
-import { Search, Filter, ChevronDown, Grid, List } from "lucide-react"
 
-// Mock data for auction items
-const AUCTION_ITEMS = [
-  {
-    id: 1,
-    title: "Vintage Mechanical Watch",
-    image: "/placeholder.svg?height=300&width=300",
-    currentBid: 450,
-    endTime: new Date(Date.now() + 86400000 * 2), // 2 days from now
-    bids: 18,
-    category: "watches",
-    condition: "excellent",
-  },
-  {
-    id: 2,
-    title: "Limited Edition Sneakers",
-    image: "/placeholder.svg?height=300&width=300",
-    currentBid: 320,
-    endTime: new Date(Date.now() + 86400000 * 1), // 1 day from now
-    bids: 24,
-    category: "fashion",
-    condition: "new",
-  },
-  {
-    id: 3,
-    title: "Rare Collectible Figurine",
-    image: "/placeholder.svg?height=300&width=300",
-    currentBid: 180,
-    endTime: new Date(Date.now() + 86400000 * 3), // 3 days from now
-    bids: 12,
-    category: "collectibles",
-    condition: "good",
-  },
-  {
-    id: 4,
-    title: "Vintage Camera",
-    image: "/placeholder.svg?height=300&width=300",
-    currentBid: 275,
-    endTime: new Date(Date.now() + 86400000 * 2.5), // 2.5 days from now
-    bids: 9,
-    category: "cameras",
-    condition: "fair",
-  },
-  {
-    id: 5,
-    title: "Gaming Console",
-    image: "/placeholder.svg?height=300&width=300",
-    currentBid: 399,
-    endTime: new Date(Date.now() + 86400000 * 4), // 4 days from now
-    bids: 32,
-    category: "electronics",
-    condition: "like-new",
-  },
-  {
-    id: 6,
-    title: "Antique Wooden Chair",
-    image: "/placeholder.svg?height=300&width=300",
-    currentBid: 150,
-    endTime: new Date(Date.now() + 86400000 * 5), // 5 days from now
-    bids: 7,
-    category: "home",
-    condition: "good",
-  },
-  {
-    id: 7,
-    title: "Designer Handbag",
-    image: "/placeholder.svg?height=300&width=300",
-    currentBid: 520,
-    endTime: new Date(Date.now() + 86400000 * 1.5), // 1.5 days from now
-    bids: 15,
-    category: "fashion",
-    condition: "excellent",
-  },
-  {
-    id: 8,
-    title: "Smartphone",
-    image: "/placeholder.svg?height=300&width=300",
-    currentBid: 350,
-    endTime: new Date(Date.now() + 86400000 * 3.5), // 3.5 days from now
-    bids: 21,
-    category: "electronics",
-    condition: "good",
-  },
-  {
-    id: 9,
-    title: "Vintage Vinyl Records Collection",
-    image: "/placeholder.svg?height=300&width=300",
-    currentBid: 120,
-    endTime: new Date(Date.now() + 86400000 * 2), // 2 days from now
-    bids: 8,
-    category: "collectibles",
-    condition: "good",
-  },
-  {
-    id: 10,
-    title: "Professional DSLR Camera",
-    image: "/placeholder.svg?height=300&width=300",
-    currentBid: 890,
-    endTime: new Date(Date.now() + 86400000 * 6), // 6 days from now
-    bids: 11,
-    category: "cameras",
-    condition: "excellent",
-  },
-  {
-    id: 11,
-    title: "Luxury Wristwatch",
-    image: "/placeholder.svg?height=300&width=300",
-    currentBid: 1200,
-    endTime: new Date(Date.now() + 86400000 * 4), // 4 days from now
-    bids: 19,
-    category: "watches",
-    condition: "new",
-  },
-  {
-    id: 12,
-    title: "Outdoor Patio Set",
-    image: "/placeholder.svg?height=300&width=300",
-    currentBid: 450,
-    endTime: new Date(Date.now() + 86400000 * 7), // 7 days from now
-    bids: 5,
-    category: "home",
-    condition: "good",
-  },
-]
+// Types for our auction data
+interface AuctionItem {
+  id: number;
+  title: string;
+  currentBid: number;
+  endTime: Date;
+  bids: number;
+  category: string;
+  condition: string;
+  imageUrl?: string; // Image support for auctions
+}
 
-// Categories for filtering
+// Constants
 const CATEGORIES = [
   { id: "all", name: "All Categories" },
   { id: "electronics", name: "Electronics" },
@@ -142,7 +30,6 @@ const CATEGORIES = [
   { id: "cameras", name: "Cameras" },
 ]
 
-// Conditions for filtering
 const CONDITIONS = [
   { id: "all", name: "All Conditions" },
   { id: "new", name: "New" },
@@ -153,104 +40,369 @@ const CONDITIONS = [
   { id: "poor", name: "Poor" },
 ]
 
+// Default image if no image is available
+const DEFAULT_IMAGE = "/placeholder-image.png"
+
+// Mock data for development if server is not available
+const MOCK_AUCTIONS = [
+  {
+    id: 1,
+    title: "Vintage Camera",
+    currentBid: 129.99,
+    endTime: new Date(Date.now() + 86400000), // 24 hours from now
+    bids: 12,
+    category: "cameras",
+    condition: "excellent",
+    imageUrl: "/placeholder-image.png"
+  },
+  {
+    id: 2,
+    title: "Designer Watch",
+    currentBid: 249.99,
+    endTime: new Date(Date.now() + 172800000), // 48 hours from now
+    bids: 8,
+    category: "watches",
+    condition: "new",
+    imageUrl: "/placeholder-image.png"
+  },
+  {
+    id: 3,
+    title: "Smartphone",
+    currentBid: 199.99,
+    endTime: new Date(Date.now() + 43200000), // 12 hours from now
+    bids: 15,
+    category: "electronics",
+    condition: "good",
+    imageUrl: "/placeholder-image.png"
+  },
+  {
+    id: 4,
+    title: "Antique Vase",
+    currentBid: 89.99,
+    endTime: new Date(Date.now() + 129600000), // 36 hours from now
+    bids: 5,
+    category: "collectibles", 
+    condition: "fair",
+    imageUrl: "/placeholder-image.png"
+  }
+];
+
 export default function BrowsePage() {
-  const [items, setItems] = useState(AUCTION_ITEMS)
-  const [filteredItems, setFilteredItems] = useState(AUCTION_ITEMS)
+  const router = useRouter();
+  const [items, setItems] = useState<AuctionItem[]>([])
+  const [filteredItems, setFilteredItems] = useState<AuctionItem[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [selectedCondition, setSelectedCondition] = useState("all")
   const [priceRange, setPriceRange] = useState({ min: "", max: "" })
   const [sortBy, setSortBy] = useState("ending-soon")
-  const [viewMode, setViewMode] = useState("grid") // grid or list
+  const [viewMode, setViewMode] = useState("grid")
   const [showFilters, setShowFilters] = useState(false)
-
-  // Format time remaining
-  const formatTimeRemaining = (endTime: Date) => {
-    const now = new Date()
-    const diff = endTime.getTime() - now.getTime()
-
-    if (diff <= 0) return "Ended"
-
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-
-    if (days > 0) return `${days}d ${hours}h left`
-    if (hours > 0) return `${hours}h ${minutes}m left`
-    return `${minutes}m left`
-  }
-
-  // Apply filters and sorting
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [connected, setConnected] = useState(false)
+  const [now, setNow] = useState(new Date()) // For live time updates
+  const [ws, setWs] = useState<WebSocket | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
+  const [useMockData, setUseMockData] = useState(false)
+  
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 3000; // 3 seconds
+  
+  // Update time every 30s
   useEffect(() => {
-    let result = [...items]
+    const interval = setInterval(() => setNow(new Date()), 30000)
+    return () => clearInterval(interval)
+  }, [])
 
-    // Apply search filter
-    if (searchQuery) {
-      result = result.filter((item) => item.title.toLowerCase().includes(searchQuery.toLowerCase()))
+  // WebSocket connection setup
+  useEffect(() => {
+    // Function to load mock data if needed
+    const loadMockData = () => {
+      console.log('Using mock auction data for development');
+      setItems(MOCK_AUCTIONS);
+      setIsLoading(false);
+      setUseMockData(true);
+    };
+    
+    // If we've already decided to use mock data, don't try to connect
+    if (useMockData) {
+      return;
     }
-
-    // Apply category filter
-    if (selectedCategory !== "all") {
-      result = result.filter((item) => item.category === selectedCategory)
+    
+    // Don't retry too many times
+    if (retryCount >= MAX_RETRIES) {
+      setError(`Could not connect to auction server after ${MAX_RETRIES} attempts. Using mock data instead.`);
+      loadMockData();
+      return;
     }
-
-    // Apply condition filter
-    if (selectedCondition !== "all") {
-      result = result.filter((item) => item.condition === selectedCondition)
+    
+    if (typeof window !== 'undefined') {
+      try {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const SERVER_HOST = process.env.NEXT_PUBLIC_SERVER_HOST || '127.0.0.1';
+        const SERVER_PORT = process.env.NEXT_PUBLIC_SERVER_PORT || '4000';
+        
+        const wsUrl = `${protocol}//${SERVER_HOST}:${SERVER_PORT}`;
+        console.log(`Connecting to WebSocket server at: ${wsUrl} (Attempt ${retryCount + 1}/${MAX_RETRIES})`);
+        
+        const websocket = new WebSocket(wsUrl);
+        setWs(websocket);
+        
+        // Set a connection timeout
+        const connectionTimeout = setTimeout(() => {
+          if (websocket.readyState !== WebSocket.OPEN) {
+            console.log('Connection timeout');
+            websocket.close();
+          }
+        }, 5000);
+        
+        websocket.onopen = () => {
+          clearTimeout(connectionTimeout);
+          console.log('Connected to WebSocket server successfully');
+          setConnected(true);
+          setError("");
+          
+          console.log('Sending GET_AUCTIONS command');
+          websocket.send(JSON.stringify({
+            type: 'command',
+            command: 'GET_AUCTIONS'
+          }));
+        };
+        
+        websocket.onmessage = (event) => {
+          try {
+            console.log('Raw received message:', event.data);
+            
+            const data = JSON.parse(event.data);
+            console.log('Parsed WebSocket message:', data);
+            
+            if (data.type === 'connection') {
+              setConnected(data.status === 'connected');
+            }
+            else if (data.type === 'error') {
+              console.error('Server error:', data.message);
+              setError(data.message);
+              setIsLoading(false);
+            }
+            else if (data.type === 'server') {
+              // The message property could be a string or an object
+              let serverData = data.message;
+              
+              // If it's a string, try to parse it as JSON
+              if (typeof serverData === 'string') {
+                try {
+                  serverData = JSON.parse(serverData);
+                } catch (error) {
+                  console.log('Message is not JSON format:', serverData);
+                }
+              }
+              
+              console.log('Processed server data:', serverData);
+              
+              // Check if this is auction data
+              if (serverData && serverData.action === 'AUCTIONS_LIST' && Array.isArray(serverData.auctions)) {
+                console.log('Received auction data:', serverData.auctions);
+                
+                // Transform the data to match our frontend format
+                const auctionItems = serverData.auctions.map((auction: any) => {
+                  return {
+                    id: Number(auction.id),
+                    title: auction.title,
+                    currentBid: Number(auction.current_bid),
+                    endTime: new Date(auction.end_time),
+                    bids: Number(auction.bid_count || 0),
+                    category: auction.category || 'Uncategorized',
+                    condition: auction.condition || 'Unknown',
+                    imageUrl: auction.image_url || DEFAULT_IMAGE
+                  };
+                });
+                
+                console.log('Transformed auction items:', auctionItems);
+                setItems(auctionItems);
+                setIsLoading(false);
+              }
+            }
+          } catch (error) {
+            console.error('Error processing message:', error);
+            setError('Failed to process data from server');
+            setIsLoading(false);
+          }
+        };
+        
+        websocket.onerror = (error) => {
+          clearTimeout(connectionTimeout);
+          console.error('WebSocket error:', error);
+          
+          // Use a specific error message instead of the generic one
+          setError('Cannot connect to auction server. Server might be down or unreachable.');
+          setConnected(false);
+          
+          // Attempt to retry after delay
+          setTimeout(() => {
+            setRetryCount(prev => prev + 1);
+          }, RETRY_DELAY);
+        };
+        
+        websocket.onclose = (event) => {
+          clearTimeout(connectionTimeout);
+          console.log(`WebSocket connection closed with code: ${event.code}, reason: ${event.reason}`);
+          setConnected(false);
+          
+          if (!event.wasClean) {
+            setError('Connection to server was lost');
+            
+            // Only retry if we haven't reached max retries
+            if (retryCount < MAX_RETRIES - 1) {
+              console.log(`Connection closed. Retrying in ${RETRY_DELAY/1000} seconds... (Attempt ${retryCount + 1}/${MAX_RETRIES})`);
+              setTimeout(() => {
+                setRetryCount(prev => prev + 1);
+              }, RETRY_DELAY);
+            } else {
+              console.log('Max retries reached. Falling back to mock data.');
+              loadMockData();
+            }
+          }
+        };
+        
+        // Clean up the WebSocket connection
+        return () => {
+          clearTimeout(connectionTimeout);
+          if (websocket) {
+            console.log('Closing WebSocket connection');
+            websocket.close();
+          }
+        };
+      } catch (error) {
+        console.error('Error setting up WebSocket:', error);
+        setError('Could not establish connection to server');
+        setIsLoading(false);
+        loadMockData();
+      }
     }
+  }, [retryCount, useMockData]);
 
-    // Apply price range filter
-    if (priceRange.min) {
-      result = result.filter((item) => item.currentBid >= Number(priceRange.min))
+  // Function to refresh auctions
+  const refreshAuctions = useCallback(() => {
+    if (useMockData) {
+      // If using mock data, just set isLoading to simulate refresh
+      setIsLoading(true);
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 500);
+      return;
     }
-    if (priceRange.max) {
-      result = result.filter((item) => item.currentBid <= Number(priceRange.max))
+    
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      setIsLoading(true);
+      setError("");
+      ws.send(JSON.stringify({
+        type: 'command',
+        command: 'GET_AUCTIONS'
+      }));
+    } else {
+      // If not connected, try to reconnect
+      setRetryCount(0); // Reset retry count to start fresh
     }
+  }, [ws, useMockData]);
 
-    // Apply sorting
-    switch (sortBy) {
-      case "ending-soon":
-        result.sort((a, b) => a.endTime.getTime() - b.endTime.getTime())
-        break
-      case "price-low":
-        result.sort((a, b) => a.currentBid - b.currentBid)
-        break
-      case "price-high":
-        result.sort((a, b) => b.currentBid - a.currentBid)
-        break
-      case "most-bids":
-        result.sort((a, b) => b.bids - a.bids)
-        break
-      default:
-        break
-    }
-
-    setFilteredItems(result)
-  }, [items, searchQuery, selectedCategory, selectedCondition, priceRange, sortBy])
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    // The search is already applied via the useEffect
-  }
+  const handleSearch = (e: React.FormEvent) => e.preventDefault();
 
   const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setPriceRange((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
+    const { name, value } = e.target;
+    setPriceRange(prev => ({ ...prev, [name]: value }));
   }
 
   const clearFilters = () => {
-    setSearchQuery("")
-    setSelectedCategory("all")
-    setSelectedCondition("all")
-    setPriceRange({ min: "", max: "" })
-    setSortBy("ending-soon")
+    setSearchQuery("");
+    setSelectedCategory("all");
+    setSelectedCondition("all");
+    setPriceRange({ min: "", max: "" });
+    setSortBy("ending-soon");
   }
 
-  return (
+  const handlePlaceBid = (auctionId: number, currentBid: number) => {
+    router.push(`/buy?id=${auctionId}&bid=${currentBid}`);
+  }
+
+  const formatTimeRemaining = (endTime: Date) => {
+    const diff = endTime.getTime() - now.getTime();
+    if (diff <= 0) return "Ended";
+    const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    if (d > 0) return `${d}d ${h}h left`;
+    if (h > 0) return `${h}h ${m}m left`;
+    return `${m}m left`;
+  }
+
+  // Debounced filter logic
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      let result = [...items];
+
+      if (searchQuery) {
+        result = result.filter(item => item.title.toLowerCase().includes(searchQuery.toLowerCase()));
+      }
+      if (selectedCategory !== "all") {
+        result = result.filter(item => item.category.toLowerCase() === selectedCategory);
+      }
+      if (selectedCondition !== "all") {
+        result = result.filter(item => item.condition.toLowerCase() === selectedCondition);
+      }
+      if (priceRange.min) {
+        result = result.filter(item => item.currentBid >= Number(priceRange.min));
+      }
+      if (priceRange.max) {
+        result = result.filter(item => item.currentBid <= Number(priceRange.max));
+      }
+
+      switch (sortBy) {
+        case "ending-soon": result.sort((a, b) => a.endTime.getTime() - b.endTime.getTime()); break;
+        case "price-low": result.sort((a, b) => a.currentBid - b.currentBid); break;
+        case "price-high": result.sort((a, b) => b.currentBid - a.currentBid); break;
+        case "most-bids": result.sort((a, b) => b.bids - a.bids); break;
+      }
+
+      setFilteredItems(result);
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [items, searchQuery, selectedCategory, selectedCondition, priceRange, sortBy]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-8">
+        <div role="status" aria-busy="true" className="text-center">
+          <div className="animate-spin h-12 w-12 border-4 border-green-500 border-r-transparent rounded-full mx-auto" />
+          <p className="mt-4 text-gray-600">Loading auctions...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && items.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-8">
+        <div className="max-w-md p-6 bg-white rounded-lg shadow text-center">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2">Connection Error</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button onClick={() => window.location.reload()} className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600">
+            Refresh Page
+          </button>
+          {/* Add a retry button as well */}
+          <button onClick={refreshAuctions} className="ml-2 border border-green-500 text-green-500 px-4 py-2 rounded-md hover:bg-green-50">
+            Retry Connection
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return ( 
     <div className="min-h-screen bg-gray-50 py-8">
+      <Navbar />
       <div className="container mx-auto px-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4 md:mb-0">Browse Auctions</h1>
@@ -291,6 +443,41 @@ export default function BrowsePage() {
             </div>
           </div>
         </div>
+
+        {useMockData && (
+          <div className="mb-4 bg-yellow-50 text-yellow-800 px-4 py-3 rounded-lg border border-yellow-200">
+            <p className="flex items-center">
+              <AlertCircle className="h-5 w-5 mr-2" />
+              Using mock data for development. Live auction data unavailable.
+              <button 
+                onClick={() => {
+                  setUseMockData(false);
+                  setRetryCount(0);
+                  setError("");
+                  setIsLoading(true);
+                }}
+                className="ml-auto bg-yellow-100 px-3 py-1 rounded hover:bg-yellow-200 text-sm"
+              >
+                Try Live Data
+              </button>
+            </p>
+          </div>
+        )}
+
+        {!connected && !useMockData && (
+          <div className="mb-4 bg-yellow-50 text-yellow-800 px-4 py-3 rounded-lg border border-yellow-200">
+            <p className="flex items-center">
+              <AlertCircle className="h-5 w-5 mr-2" />
+              Not connected to server. Some features may be unavailable.
+              <button 
+                onClick={refreshAuctions}
+                className="ml-auto bg-yellow-100 px-3 py-1 rounded hover:bg-yellow-200 text-sm"
+              >
+                Retry
+              </button>
+            </p>
+          </div>
+        )}
 
         <div className="flex flex-col md:flex-row gap-6">
           {/* Filters Sidebar */}
@@ -354,7 +541,7 @@ export default function BrowsePage() {
               <h3 className="font-medium text-gray-900 mb-3">Price Range</h3>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label htmlFor="min" className="block text-xs text-black-500 mb-1">
+                  <label htmlFor="min" className="block text-xs text-gray-500 mb-1">
                     Min ($)
                   </label>
                   <input
@@ -365,11 +552,11 @@ export default function BrowsePage() {
                     value={priceRange.min}
                     onChange={handlePriceChange}
                     placeholder="Min"
-                    className="w-full px-3 py-1 text-black border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
                 <div>
-                  <label htmlFor="max" className="block text-xs text-black-500 mb-1">
+                  <label htmlFor="max" className="block text-xs text-gray-500 mb-1">
                     Max ($)
                   </label>
                   <input
@@ -380,7 +567,7 @@ export default function BrowsePage() {
                     value={priceRange.max}
                     onChange={handlePriceChange}
                     placeholder="Max"
-                    className="w-full px-3 py-1 text-black border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
               </div>
@@ -391,7 +578,7 @@ export default function BrowsePage() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="w-full px-3 py-2 text-black border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
               >
                 <option value="ending-soon">Ending Soon</option>
                 <option value="price-low">Price: Low to High</option>
@@ -447,30 +634,41 @@ export default function BrowsePage() {
                       >
                         <Link href={`/auction/${item.id}`}>
                           <div className="relative h-48 bg-gray-100">
-                            <Image
-                              src={item.image || "/placeholder.svg"}
-                              alt={item.title}
-                              fill
-                              className="object-cover"
-                            />
+                            {item.imageUrl ? (
+                              <img 
+                                src={item.imageUrl}
+                                alt={item.title}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex items-center justify-center h-full w-full bg-gray-200">
+                                <Camera className="h-8 w-8 text-gray-400" />
+                              </div>
+                            )}
                           </div>
                           <div className="p-4">
                             <h3 className="font-medium text-gray-900 mb-1 truncate">{item.title}</h3>
                             <div className="flex justify-between items-center mb-2">
                               <div>
                                 <p className="text-sm text-gray-500">Current Bid</p>
-                                <p className="text-lg font-bold text-gray-900">${item.currentBid}</p>
+                                <p className="text-lg font-bold text-gray-900">${item.currentBid.toFixed(2)}</p>
                               </div>
                               <div className="text-right">
                                 <p className="text-sm text-gray-500">{item.bids} bids</p>
                                 <p className="text-sm font-medium text-red-500">{formatTimeRemaining(item.endTime)}</p>
                               </div>
                             </div>
-                            <button className="w-full mt-2 py-2 px-4 bg-green-500 hover:bg-green-600 text-white rounded-md transition-colors">
-                              Place Bid
-                            </button>
                           </div>
                         </Link>
+                        <div className="px-4 pb-4">
+                          <button 
+                            onClick={() => handlePlaceBid(item.id, item.currentBid)} 
+                            className="w-full py-2 px-4 bg-green-500 hover:bg-green-600 text-white rounded-md transition-colors"
+                            disabled={!connected && !useMockData}
+                          >
+                            Place Bid
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -481,22 +679,29 @@ export default function BrowsePage() {
                         key={item.id}
                         className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-300"
                       >
-                        <Link href={`/auction/${item.id}`} className="flex">
-                          <div className="relative h-32 w-32 sm:w-48 bg-gray-100 flex-shrink-0">
-                            <Image
-                              src={item.image || "/placeholder.svg"}
-                              alt={item.title}
-                              fill
-                              className="object-cover"
-                            />
-                          </div>
+                        <div className="flex flex-col sm:flex-row">
+                          <Link href={`/auction/${item.id}`} className="relative h-32 w-full sm:w-48 bg-gray-100 flex-shrink-0">
+                            {item.imageUrl ? (
+                              <img 
+                                src={item.imageUrl}
+                                alt={item.title}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="flex items-center justify-center h-full w-full bg-gray-200">
+                                <Camera className="h-6 w-6 text-gray-400" />
+                              </div>
+                            )}
+                          </Link>
                           <div className="p-4 flex-1 flex flex-col">
-                            <h3 className="font-medium text-gray-900 mb-1">{item.title}</h3>
+                            <Link href={`/auction/${item.id}`}>
+                              <h3 className="font-medium text-gray-900 mb-1">{item.title}</h3>
+                            </Link>
                             <div className="flex-1">
                               <div className="flex justify-between items-center mb-2">
                                 <div>
                                   <p className="text-sm text-gray-500">Current Bid</p>
-                                  <p className="text-lg font-bold text-gray-900">${item.currentBid}</p>
+                                  <p className="text-lg font-bold text-gray-900">${item.currentBid.toFixed(2)}</p>
                                 </div>
                                 <div className="text-right">
                                   <p className="text-sm text-gray-500">{item.bids} bids</p>
@@ -511,13 +716,17 @@ export default function BrowsePage() {
                                 <span className="capitalize">{item.category}</span>
                               </div>
                             </div>
-                            <div className="mt-4 sm:mt-0 sm:self-end">
-                              <button className="py-2 px-4 bg-green-500 hover:bg-green-600 text-white rounded-md transition-colors">
+                            <div className="mt-4">
+                              <button 
+                                onClick={() => handlePlaceBid(item.id, item.currentBid)} 
+                                className="py-2 px-4 bg-green-500 hover:bg-green-600 text-white rounded-md transition-colors"
+                                disabled={!connected && !useMockData}
+                              >
                                 Place Bid
                               </button>
                             </div>
                           </div>
-                        </Link>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -528,6 +737,5 @@ export default function BrowsePage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
-

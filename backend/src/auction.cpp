@@ -35,26 +35,89 @@ bool Auction::createAuction(int userId, const std::string& itemName, double star
     }
 }
 
+// Modified to match the signature expected in server.cpp
 bool Auction::getAllAuctions(std::vector<std::tuple<int, std::string, double, std::string>>& auctions) {
     try {
-        std::string query = "SELECT auction_id, item_name, current_price, end_time FROM auction WHERE status = 'active';";
+        std::string query = R"(
+            SELECT 
+                a.auction_id, 
+                a.item_name, 
+                a.current_price, 
+                a.end_time
+            FROM 
+                auction a
+            WHERE 
+                a.status = 'active'
+        )";
         
         pqxx::work txn(*database.getConnection());
         pqxx::result result = txn.exec(query);
         txn.commit();
         
         for (const auto& row : result) {
-            int auctionId = row[0].as<int>();
-            std::string itemName = row[1].as<std::string>();
-            double currentPrice = row[2].as<double>();
-            std::string endTime = row[3].as<std::string>();
+            int auctionId = row["auction_id"].as<int>();
+            std::string itemName = row["item_name"].as<std::string>();
+            double currentPrice = row["current_price"].as<double>();
+            std::string endTime = row["end_time"].as<std::string>();
             
             auctions.emplace_back(auctionId, itemName, currentPrice, endTime);
         }
         
-        return true;
+        return !auctions.empty();
     } catch (const std::exception& e) {
-        std::cerr << "Error fetching all auctions: " << e.what() << std::endl;
+        std::cerr << "Error fetching auctions: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+// Additional method that returns more detailed auction information
+// This can be used alongside the simpler method for backward compatibility
+bool Auction::getAllAuctionDetails(std::vector<AuctionDetails>& auctions) {
+    try {
+        std::string query = R"(
+            SELECT 
+                a.auction_id, 
+                a.item_name, 
+                a.current_price, 
+                a.end_time, 
+                a.category_id, 
+                COALESCE(c.name, 'Uncategorized') AS category_name,
+                COALESCE((SELECT COUNT(*) FROM bids WHERE auction_id = a.auction_id), 0) AS bid_count,
+                CASE 
+                    WHEN a.current_price > a.starting_price * 1.5 THEN 'excellent'
+                    WHEN a.current_price > a.starting_price * 1.25 THEN 'good'
+                    WHEN a.current_price > a.starting_price * 1.1 THEN 'fair'
+                    ELSE 'new'
+                END AS condition
+            FROM 
+                auction a
+            LEFT JOIN 
+                category c ON a.category_id = c.id
+            WHERE 
+                a.status = 'active'
+        )";
+        
+        pqxx::work txn(*database.getConnection());
+        pqxx::result result = txn.exec(query);
+        txn.commit();
+        
+        for (const auto& row : result) {
+            AuctionDetails auction;
+            auction.auction_id = row["auction_id"].as<int>();
+            auction.item_name = row["item_name"].as<std::string>();
+            auction.current_price = row["current_price"].as<double>();
+            auction.end_time = row["end_time"].as<std::string>();
+            auction.category_id = row["category_id"].as<int>();
+            auction.category_name = row["category_name"].as<std::string>();
+            auction.bid_count = row["bid_count"].as<int>();
+            auction.condition = row["condition"].as<std::string>();
+            
+            auctions.push_back(auction);
+        }
+        
+        return !auctions.empty();
+    } catch (const std::exception& e) {
+        std::cerr << "Error fetching auctions: " << e.what() << std::endl;
         return false;
     }
 }
