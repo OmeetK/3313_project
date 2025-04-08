@@ -270,7 +270,7 @@ private:
         
             bool success = sellManager.createListing(extractedUserId, itemName, startingPriceDouble, endTime, categoryIdInt, imageUrl);
         
-            return success ? "Listing created successfully!" : "Failed to create listing.";
+            return success ? "Listing created successfully!\n" : "Failed to create listing.\n";
         }
         
         
