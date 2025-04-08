@@ -7,7 +7,11 @@ const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocket.Server({ 
+    server,
+    perMessageDeflate: false,
+    // Force server to listen on all interfaces (IPv4 and IPv6)
+    host: '::' });
 
 // Configuration
 const PORT = process.env.PORT || 4000;
@@ -42,14 +46,19 @@ wss.on('connection', (ws) => {
     let loggedIn = false;
     
     // Connect to C++ server
-    tcpClient.connect(CPP_SERVER_PORT, CPP_SERVER_HOST, () => {
+    tcpClient.connect({
+        port: CPP_SERVER_PORT,
+        host: CPP_SERVER_HOST,
+        // This is the key setting to enable IPv6 support
+        family: 0  // 0 means try both IPv4 and IPv6, 4 = IPv4 only, 6 = IPv6 only
+      }, () => {
         console.log(`Connected to C++ server at ${CPP_SERVER_HOST}:${CPP_SERVER_PORT}`);
         ws.send(JSON.stringify({
-            type: 'connection',
-            status: 'connected',
-            message: `Connected to server at ${CPP_SERVER_HOST}:${CPP_SERVER_PORT}`
+          type: 'connection',
+          status: 'connected',
+          message: `Connected to server at ${CPP_SERVER_HOST}:${CPP_SERVER_PORT}`
         }));
-    });
+      });
     
     // Buffer for incomplete messages
     let buffer = '';
@@ -94,7 +103,7 @@ wss.on('connection', (ws) => {
                 // This was an explicit login, send the response
                 ws.send(JSON.stringify({
                     type: 'server',
-                    message: responseData
+                    response: responseData
                 }));
             }
             return;
@@ -229,8 +238,8 @@ app.get('/health', (req, res) => {
 });
 
 // Start the server
-server.listen(PORT, () => {
-    console.log(`Proxy server running on http://localhost:${PORT}`);
+server.listen(PORT, '::', () => {
+    console.log(`Proxy server running on http://[::]:${PORT}`);
     console.log(`Forwarding to C++ server at ${CPP_SERVER_HOST}:${CPP_SERVER_PORT}`);
 });
 
