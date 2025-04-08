@@ -4,6 +4,7 @@
 #include <pqxx/pqxx>
 #include <iostream>
 #include <sstream>
+#include <mutex>
 
 Database::Database(const std::string& connection_string) 
     : connection_string(connection_string) {
@@ -64,6 +65,16 @@ bool Database::createTablesIfNotExist() {
             "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
             ");"
         );
+
+        executeQuery(
+            "CREATE TABLE IF NOT EXISTS bids ("
+            "bid_id SERIAL PRIMARY KEY,"
+            "auction_id INTEGER REFERENCES auction(auction_id),"
+            "bidder_id INTEGER REFERENCES users(user_id),"
+            "bid_amount NUMERIC(10, 2) NOT NULL,"
+            "bid_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+            ");"
+        );
         
         
         // Create Transactions table
@@ -95,6 +106,7 @@ bool Database::createTablesIfNotExist() {
 }
 
 bool Database::executeQuery(const std::string& query) {
+    std::lock_guard<std::mutex> lock(db_mutex); // Lock the mutex
     try {
         if (!conn || !conn->is_open()) {
             std::cerr << "Database connection lost. Attempting to reconnect..." << std::endl;
@@ -114,4 +126,5 @@ bool Database::executeQuery(const std::string& query) {
         std::cerr << "Query execution error: " << e.what() << std::endl;
         return false;
     }
+    // lock_guard automatically releases the mutex when it goes out of scope
 }

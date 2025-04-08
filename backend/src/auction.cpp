@@ -2,6 +2,8 @@
 #include <iostream>
 #include <pqxx/pqxx>
 #include <sstream>
+#include <mutex>
+#include <unordered_map>
 
 Auction::Auction(Database& db) : database(db) {}
 
@@ -127,52 +129,84 @@ bool Auction::getAuctionDetailsWithBids(int auctionId, AuctionDetails& details) 
 }
 
 bool Auction::placeBid(int auctionId, int userId, double bidAmount, std::string& errorMessage) {
+    // Change mutex types to timed_mutex to support timeout operations
+    static std::mutex bidMutex;  // Global mutex for bidding operations
+    static std::unordered_map<int, std::timed_mutex> auctionMutexes; // Changed to timed_mutex
+    static std::mutex mapMutex;  // To protect access to the mutex map itself
+    
     try {
-        pqxx::work txn(*database.getConnection());
-
-        // Ensure the bids table exists (noninvasive)
-        std::string createBidsTableQuery =
-            "CREATE TABLE IF NOT EXISTS bids ("
-            "bid_id SERIAL PRIMARY KEY, "
-            "auction_id INTEGER REFERENCES auction(auction_id), "
-            "bidder_id INTEGER REFERENCES users(user_id), "
-            "bid_amount NUMERIC(10,2) NOT NULL, "
-            "bid_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
-            ");";
-        txn.exec(createBidsTableQuery);
-
-        // Lock the auction row for update
-        std::string selectQuery = 
-            "SELECT current_price FROM auction "
-            "WHERE auction_id = " + std::to_string(auctionId) + " FOR UPDATE;";
-        pqxx::result result = txn.exec(selectQuery);
-
-        if (result.empty()) {
-            errorMessage = "Auction not found.";
-            return false;
+        // Use scoped_lock to atomically acquire multiple locks without deadlock
+        {
+            // First acquire the global bidding mutex (short-term)
+            std::lock_guard<std::mutex> globalLock(bidMutex);
+            
+            // Get or create auction-specific mutex
+            std::timed_mutex* auctionMutexPtr;
+            {
+                std::lock_guard<std::mutex> mapLock(mapMutex);
+                auctionMutexPtr = &auctionMutexes[auctionId];
+            }
+            
+            // Now try_lock_for will work with timed_mutex
+            if (!auctionMutexPtr->try_lock_for(std::chrono::seconds(3))) {
+                errorMessage = "System is busy processing another bid on this auction. Please try again.";
+                return false;
+            }
+            
+            // Use RAII to automatically release the lock
+            std::lock_guard<std::timed_mutex> auctionLock(*auctionMutexPtr, std::adopt_lock);
+            
+            // STEP 2: Begin database transaction with timeout
+            pqxx::work txn(*database.getConnection());
+            
+            try {
+                // Set statement timeout to prevent database-level deadlock
+                txn.exec("SET LOCAL statement_timeout = '5000';"); // 5 second timeout
+                
+                // Lock the auction row for update
+                std::string selectQuery = 
+                    "SELECT current_price FROM auction "
+                    "WHERE auction_id = " + std::to_string(auctionId) + " FOR UPDATE NOWAIT;"; // NOWAIT fails immediately if locked
+                pqxx::result result = txn.exec(selectQuery);
+                
+                if (result.empty()) {
+                    errorMessage = "Auction not found.";
+                    return false;
+                }
+                
+                double currentPrice = result[0]["current_price"].as<double>();
+                if (bidAmount < currentPrice + 10) {
+                    errorMessage = "Bid must be at least $10 higher than the current price.";
+                    return false;
+                }
+                
+                // Update the current price on the auction
+                std::string updateQuery = 
+                    "UPDATE auction SET current_price = " + std::to_string(bidAmount) +
+                    " WHERE auction_id = " + std::to_string(auctionId) + ";";
+                txn.exec(updateQuery);
+                
+                // Insert the new bid
+                std::string insertBidQuery = 
+                    "INSERT INTO bids (auction_id, bidder_id, bid_amount) VALUES (" +
+                    std::to_string(auctionId) + ", " + std::to_string(userId) + ", " + 
+                    std::to_string(bidAmount) + ");";
+                txn.exec(insertBidQuery);
+                
+                // Commit the transaction
+                txn.commit();
+                return true;
+                
+            } catch (const pqxx::sql_error& e) {
+                if (std::string(e.what()).find("could not obtain lock") != std::string::npos ||
+                    std::string(e.what()).find("statement timeout") != std::string::npos) {
+                    errorMessage = "Another bid is being processed. Please try again.";
+                } else {
+                    errorMessage = e.what();
+                }
+                return false;
+            }
         }
-
-        double currentPrice = result[0]["current_price"].as<double>();
-        if (bidAmount < currentPrice + 10) {
-            errorMessage = "Bid must be at least $10 higher than the current price.";
-            return false;
-        }
-
-        // Update the current price on the auction
-        std::string updateQuery = 
-            "UPDATE auction SET current_price = " + std::to_string(bidAmount) +
-            " WHERE auction_id = " + std::to_string(auctionId) + ";";
-        txn.exec(updateQuery);
-
-        // Insert the new bid, note we use bidder_id instead of user_id
-        std::string insertBidQuery = 
-            "INSERT INTO bids (auction_id, bidder_id, bid_amount) VALUES (" +
-            std::to_string(auctionId) + ", " + std::to_string(userId) + ", " + 
-            std::to_string(bidAmount) + ");";
-        txn.exec(insertBidQuery);
-
-        txn.commit();
-        return true;
     } catch (const std::exception& e) {
         errorMessage = e.what();
         return false;
