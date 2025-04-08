@@ -1,3 +1,5 @@
+// database.cpp
+
 #include "database.h"
 #include <pqxx/pqxx>
 #include <iostream>
@@ -116,4 +118,3 @@ bool Database::executeQuery(const std::string& query) {
     }
     // lock_guard automatically releases the mutex when it goes out of scope
 }
-
