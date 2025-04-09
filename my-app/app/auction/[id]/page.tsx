@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, FormEvent } from "react";
+import React, { useState, useEffect, FormEvent, use } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import websocketService from "@/app/lib/websocket";
+import Navbar from "@/app/Navbar"
+
 
 interface Bid {
   username: string;
@@ -19,6 +21,10 @@ interface AuctionData {
 }
 
 export default function AuctionDetailPage({ params }: { params: { id: string } }) {
+  // Unwrap the params Promise using React.use()
+  const unwrappedParams = use(params as any);
+  const auctionId = unwrappedParams.id;
+  
   const [auction, setAuction] = useState<AuctionData | null>(null);
   const [bidAmount, setBidAmount] = useState<number>(0);
   const [errorMessage, setErrorMessage] = useState("");
@@ -27,7 +33,7 @@ export default function AuctionDetailPage({ params }: { params: { id: string } }
     // Connect to the WebSocket once
     websocketService.connect().then(() => {
       // Request the auction details
-      const cmd = `GET_AUCTION ${params.id}`;
+      const cmd = `GET_AUCTION ${auctionId}`;
       websocketService.sendCommand(cmd);
     });
 
@@ -45,7 +51,7 @@ export default function AuctionDetailPage({ params }: { params: { id: string } }
           }
         } else if (data.response.includes("Bid placed successfully")) {
           // Force re-fetch the auction to see the updated currentBid + new bid
-          const cmd = `GET_AUCTION ${params.id}`;
+          const cmd = `GET_AUCTION ${auctionId}`;
           websocketService.sendCommand(cmd);
         } else if (data.response.startsWith("Bid failed:")) {
           setErrorMessage(data.response);
@@ -59,7 +65,7 @@ export default function AuctionDetailPage({ params }: { params: { id: string } }
 
     // Cleanup if your websocketService supports off() / remove listener
     // return () => { websocketService.off("message", handleMessage) }
-  }, [params.id]);
+  }, [auctionId]);
 
   const handleBid = (e: FormEvent) => {
     e.preventDefault();
@@ -81,6 +87,7 @@ export default function AuctionDetailPage({ params }: { params: { id: string } }
 
   return (
     <div className="p-6">
+      <Navbar />
       <h1 className="text-2xl font-bold mb-4">{auction.title}</h1>
       <p className="mb-2">Current bid: ${auction.currentBid}</p>
       <p className="mb-2">Ends: {auction.endTime}</p>

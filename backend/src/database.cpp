@@ -50,6 +50,8 @@ bool Database::createTablesIfNotExist() {
             "balance NUMERIC(10, 2) DEFAULT 0.00"
             ");"
         );
+
+        // Create Auction table
         executeQuery(
             "CREATE TABLE IF NOT EXISTS auction ("
             "auction_id SERIAL PRIMARY KEY,"
@@ -60,12 +62,13 @@ bool Database::createTablesIfNotExist() {
             "end_time TIMESTAMP NOT NULL,"
             "status VARCHAR(20) DEFAULT 'active',"
             "winner_id INTEGER REFERENCES users(user_id),"
-            "category_id INTEGER NOT NULL DEFAULT 1," // Add this line
+            "category_id INTEGER NOT NULL DEFAULT 1,"
             "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
             "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
             ");"
         );
 
+        // Create Bids table
         executeQuery(
             "CREATE TABLE IF NOT EXISTS bids ("
             "bid_id SERIAL PRIMARY KEY,"
@@ -76,12 +79,11 @@ bool Database::createTablesIfNotExist() {
             ");"
         );
         
-        
         // Create Transactions table
         executeQuery(
             "CREATE TABLE IF NOT EXISTS transactions ("
             "id SERIAL PRIMARY KEY,"
-            "user_id INTEGER REFERENCES users(id),"
+            "user_id INTEGER REFERENCES users(user_id),"
             "status VARCHAR(20) DEFAULT 'pending',"
             "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,"
             "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
@@ -106,7 +108,7 @@ bool Database::createTablesIfNotExist() {
 }
 
 bool Database::executeQuery(const std::string& query) {
-    std::lock_guard<std::mutex> lock(db_mutex); // Lock the mutex
+    std::lock_guard<std::mutex> lock(db_mutex); // Lock the mutex for thread safety
     try {
         if (!conn || !conn->is_open()) {
             std::cerr << "Database connection lost. Attempting to reconnect..." << std::endl;

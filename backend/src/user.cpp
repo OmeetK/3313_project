@@ -1,6 +1,7 @@
 #include "user.h"
 #include <iostream>
 #include <jwt/jwt.hpp>
+#include <pqxx/pqxx>
 
 User::User(Database& db) : database(db) {}
 

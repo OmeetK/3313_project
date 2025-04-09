@@ -7,6 +7,7 @@
 
 Auction::Auction(Database& db) : database(db) {}
 
+// Returns the auction ID on success, -1 on failure
 int Auction::createAuction(int userId, const std::string& itemName, double startingPrice,
                            const std::string& endTime, int categoryId) {
     try {
@@ -47,25 +48,92 @@ int Auction::createAuction(int userId, const std::string& itemName, double start
     }
 }
 
+// For backward compatibility - returns true if auction was created
+bool Auction::createAuctionBool(int userId, const std::string& itemName, double startingPrice,
+                               const std::string& endTime, int categoryId) {
+    return createAuction(userId, itemName, startingPrice, endTime, categoryId) > 0;
+}
+
 bool Auction::getAllAuctions(std::vector<std::tuple<int, std::string, double, std::string>>& auctions) {
     try {
         std::string query = "SELECT auction_id, item_name, current_price, end_time "
                             "FROM auction WHERE status = 'active';";
-
+        
+        std::cout << "Executing getAllAuctions query: " << query << std::endl;
+        
         pqxx::work txn(*database.getConnection());
         pqxx::result result = txn.exec(query);
         txn.commit();
-
+        
+        // Debug: Log the result size
+        std::cout << "Query returned " << result.size() << " rows" << std::endl;
+        
         for (const auto& row : result) {
             int auctionId = row["auction_id"].as<int>();
             std::string itemName = row["item_name"].as<std::string>();
             double price = row["current_price"].as<double>();
             std::string endTime = row["end_time"].as<std::string>();
+            
+            std::cout << "Adding auction: " << auctionId << ", " << itemName << ", " << price << std::endl;
+            
             auctions.emplace_back(auctionId, itemName, price, endTime);
         }
+        
+        // Return true if we successfully executed the query, even if no auctions were found
         return true;
     } catch (const std::exception& e) {
         std::cerr << "[Auction::getAllAuctions] Error: " << e.what() << std::endl;
+        return false;
+    }
+}
+
+// Additional method that returns more detailed auction information
+bool Auction::getAllAuctionDetails(std::vector<AuctionDetails>& auctions) {
+    try {
+        std::string query = R"(
+            SELECT 
+                a.auction_id, 
+                a.item_name, 
+                a.current_price, 
+                a.end_time, 
+                a.category_id, 
+                COALESCE(c.name, 'Uncategorized') AS category_name,
+                COALESCE((SELECT COUNT(*) FROM bids WHERE auction_id = a.auction_id), 0) AS bid_count,
+                CASE 
+                    WHEN a.current_price > a.starting_price * 1.5 THEN 'excellent'
+                    WHEN a.current_price > a.starting_price * 1.25 THEN 'good'
+                    WHEN a.current_price > a.starting_price * 1.1 THEN 'fair'
+                    ELSE 'new'
+                END AS condition
+            FROM 
+                auction a
+            LEFT JOIN 
+                category c ON a.category_id = c.id
+            WHERE 
+                a.status = 'active'
+        )";
+        
+        pqxx::work txn(*database.getConnection());
+        pqxx::result result = txn.exec(query);
+        txn.commit();
+        
+        for (const auto& row : result) {
+            AuctionDetails auction;
+            auction.auctionId = row["auction_id"].as<int>();
+            auction.itemName = row["item_name"].as<std::string>();
+            auction.currentPrice = row["current_price"].as<double>();
+            auction.endTime = row["end_time"].as<std::string>();
+            auction.categoryId = row["category_id"].as<int>();
+            auction.categoryName = row["category_name"].as<std::string>();
+            auction.bidCount = row["bid_count"].as<int>();
+            auction.condition = row["condition"].as<std::string>();
+            
+            auctions.push_back(auction);
+        }
+        
+        return !auctions.empty();
+    } catch (const std::exception& e) {
+        std::cerr << "[Auction::getAllAuctionDetails] Error: " << e.what() << std::endl;
         return false;
     }
 }

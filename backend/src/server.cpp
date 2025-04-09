@@ -10,11 +10,12 @@
 #include <sstream>
 #include <chrono>
 #include <fstream>
+#include <iomanip>
+#include <pqxx/pqxx>
 #include "database.h"
 #include "user.h"
 #include "auction.h"
 #include "sell.h"
-#include <iomanip>
 
 // Platform-specific socket headers
 #ifdef _WIN32
@@ -37,8 +38,11 @@
     #define SOCKET_ERROR_CODE errno
 #endif
 
+// Database instance
+std::unique_ptr<Database> g_db;
+
 // JSON escape helper function; escapes quotes and control characters.
-std::string escapeStringForJson(const std::string &input) {
+std::string escapeJsonString(const std::string &input) {
     std::ostringstream ss;
     for (char c : input) {
         switch (c) {
@@ -61,12 +65,10 @@ std::string escapeStringForJson(const std::string &input) {
     return ss.str();
 }
 
-std::unique_ptr<Database> g_db;
-
 class ClientSession {
 public:
     ClientSession(socket_t clientSocket, Database& db)
-        : socket(clientSocket), database(db), authenticated(false), running(true) {}
+        : socket(clientSocket), database(db), authenticated(false), running(true), userId(-1), currentTransaction(-1) {}
 
     void handleClient() {
         char buffer[1024];
@@ -100,7 +102,8 @@ private:
     bool authenticated;
     bool running;
     std::string username;
-    int userId = -1;
+    int userId;
+    int currentTransaction;
 
     std::string processCommand(const std::string& command) {
         std::istringstream iss(command);
@@ -164,7 +167,6 @@ private:
         }
 
         if (cmd == "CREATE_LISTING") {
-
             std::string itemName, startingPrice, endTime;
             int categoryIdInt = 1;
         
@@ -211,7 +213,6 @@ private:
             return success ? "Listing created successfully!" : "Failed to create listing.";
         }
 
-
         if (cmd == "CREATE_LISTING_TOKEN") {
             std::string token, itemName, startingPrice, endTime;
             int categoryIdInt = 1;
@@ -256,13 +257,12 @@ private:
             }
         
             std::cout << "Parsed Listing -> userId: " << extractedUserId
-            << ", item: " << itemName
-            << ", price: " << startingPrice
-            << ", endTime: " << endTime
-            << ", category: " << categoryIdInt
-            << ", image=" << imageUrl << std::endl;
+                << ", item: " << itemName
+                << ", price: " << startingPrice
+                << ", endTime: " << endTime
+                << ", category: " << categoryIdInt
+                << ", image=" << imageUrl << std::endl;
   
-        
             double startingPriceDouble = std::stod(startingPrice);
         
             static Auction auctionManager(database);
@@ -272,73 +272,6 @@ private:
         
             return success ? "Listing created successfully!\n" : "Failed to create listing.\n";
         }
-        
-        
-        
-        
-            
-        // Transaction commands commented out for now
-        // if (cmd == "BEGIN") {
-        //     if (currentTransaction != -1) {
-        //         return "You already have an active transaction.\n";
-        //     }
-            
-        //     currentTransaction = database.beginTransaction(username);
-        //     if (currentTransaction != -1) {
-        //         return "Transaction " + std::to_string(currentTransaction) + " started.\n";
-        //     } else {
-        //         return "Failed to start transaction.\n";
-        //     }
-        // }
-        
-        // if (cmd == "EXECUTE") {
-        //     if (currentTransaction == -1) {
-        //         return "No active transaction. Begin one with BEGIN command.\n";
-        //     }
-            
-        //     std::string operation;
-        //     std::getline(iss, operation);
-        //     operation = operation.substr(operation.find_first_not_of(" \t")); // Trim leading whitespace
-            
-        //     if (database.executeOperation(currentTransaction, operation)) {
-        //         return "Operation executed successfully.\n";
-        //     } else {
-        //         return "Operation failed!\n";
-        //     }
-        // }
-        
-        // if (cmd == "COMMIT") {
-        //     if (currentTransaction == -1) {
-        //         return "No active transaction to commit.\n";
-        //     }
-            
-        //     int transId = currentTransaction;
-        //     currentTransaction = -1;
-            
-        //     if (database.commitTransaction(transId)) {
-        //         return "Transaction " + std::to_string(transId) + " committed successfully.\n";
-        //     } else {
-        //         return "Failed to commit transaction " + std::to_string(transId) + ".\n";
-        //     }
-        // }
-        
-        // if (cmd == "ROLLBACK") {
-        //     if (currentTransaction == -1) {
-        //         return "No active transaction to rollback.\n";
-        //     }
-            
-        //     int transId = currentTransaction;
-        //     currentTransaction = -1;
-            
-        //     if (database.rollbackTransaction(transId)) {
-        //         return "Transaction " + std::to_string(transId) + " rolled back.\n";
-        //     } else {
-        //         return "Failed to rollback transaction " + std::to_string(transId) + ".\n";
-        //     }
-        // }
-        
-          //  return "Not implemented in this snippet.\n";
-        //}
 
         // GET_ALL_AUCTIONS: Build JSON response with escaped strings.
         if (cmd == "GET_ALL_AUCTIONS") {
@@ -352,7 +285,7 @@ private:
             for (size_t i = 0; i < auctions.size(); i++) {
                 auto [aid, name, price, endT] = auctions[i];
                 ss << "{\"id\":" << aid
-                   << ",\"title\":\"" << escapeStringForJson(name)
+                   << ",\"title\":\"" << escapeJsonString(name)
                    << "\",\"currentPrice\":" << price
                    << ",\"endTime\":\"" << endT << "\"}";
                 if (i + 1 < auctions.size()) {
@@ -376,13 +309,13 @@ private:
             }
             std::stringstream ss;
             ss << "{\"id\":" << details.auctionId
-               << ",\"title\":\"" << escapeStringForJson(details.itemName)
+               << ",\"title\":\"" << escapeJsonString(details.itemName)
                << "\",\"currentBid\":" << details.currentPrice
                << ",\"endTime\":\"" << details.endTime
                << "\",\"bids\":[";
             for (size_t i = 0; i < details.bids.size(); i++) {
                 const auto& b = details.bids[i];
-                ss << "{\"username\":\"" << escapeStringForJson(b.username)
+                ss << "{\"username\":\"" << escapeJsonString(b.username)
                    << "\",\"amount\":" << b.amount
                    << ",\"time\":\"" << b.bidTime << "\"}";
                 if (i + 1 < details.bids.size()) {
@@ -393,7 +326,124 @@ private:
             return "AUCTION_DETAILS " + ss.str() + "\n";
         }
 
-        // BID command: use bidder_id since that’s the column in the database.
+        if (cmd == "GET_AUCTIONS") {
+            Auction auction(database);
+            std::vector<std::tuple<int, std::string, double, std::string>> auctions;
+            
+            // Using getThenCheck pattern for debugging
+            bool gotAuctions = auction.getAllAuctions(auctions);
+            std::cout << "getAllAuctions returned: " << (gotAuctions ? "true" : "false") 
+                      << " with " << auctions.size() << " auctions" << std::endl;
+            
+            if (gotAuctions) {
+                std::stringstream jsonResponse;
+                jsonResponse << "{\"action\":\"AUCTIONS_LIST\",\"auctions\":[";
+                
+                bool first = true;
+                for (const auto& item : auctions) {
+                    if (!first) jsonResponse << ",";
+                    
+                    int auctionId = std::get<0>(item);
+                    std::string title = std::get<1>(item);
+                    double currentBid = std::get<2>(item);
+                    std::string endTime = std::get<3>(item);
+                    
+                    // Get image URL and category_id in one query to reduce database calls
+                    std::string query = "SELECT category_id, image_url, starting_price, current_price FROM auction WHERE auction_id = " + std::to_string(auctionId);
+                    try {
+                        pqxx::work txn(*database.getConnection());
+                        pqxx::result result = txn.exec(query);
+                        txn.commit();
+                        
+                        // Set defaults
+                        std::string categoryName = "other";
+                        std::string imageUrl = "";
+                        std::string condition = "new";
+                        int bidCount = 0;
+                        
+                        if (!result.empty()) {
+                            int categoryId = result[0]["category_id"].as<int>();
+                            
+                            // Only try to get category name if we have a valid category_id
+                            // and we know the category table exists
+                            try {
+                                pqxx::work categoryTxn(*database.getConnection());
+                                pqxx::result categoryResult = categoryTxn.exec(
+                                    "SELECT category_name AS category_name FROM category WHERE category_id = " + std::to_string(categoryId)
+                                );
+                                categoryTxn.commit();
+                                
+                                if (!categoryResult.empty()) {
+                                    categoryName = categoryResult[0]["category_name"].as<std::string>();
+                                }
+                            } catch (const std::exception& e) {
+                                // If this fails, we'll still use the default category name
+                                std::cerr << "Error getting category name: " << e.what() << std::endl;
+                            }
+                            
+                            // Try to get bid count
+                            try {
+                                pqxx::work txn2(*database.getConnection());
+                                pqxx::result bidResult = txn2.exec(
+                                    "SELECT COUNT(*) as bid_count FROM bids WHERE auction_id = " + std::to_string(auctionId)
+                                );
+                                txn2.commit();
+                                
+                                if (!bidResult.empty()) {
+                                    bidCount = bidResult[0]["bid_count"].as<int>();
+                                }
+                            } catch (const std::exception& e) {
+                                std::cerr << "Error getting bid count: " << e.what() << std::endl;
+                            }
+                            
+                            // Process image URL if present
+                            if (!result[0]["image_url"].is_null()) {
+                                imageUrl = result[0]["image_url"].as<std::string>();
+                            }
+                            
+                            // Calculate condition
+                            double startingPrice = result[0]["starting_price"].as<double>();
+                            double currentPrice = result[0]["current_price"].as<double>();
+                            double ratio = startingPrice > 0 ? currentPrice / startingPrice : 1.0;
+                            
+                            if (ratio > 1.5) condition = "excellent";
+                            else if (ratio > 1.25) condition = "good";
+                            else if (ratio > 1.1) condition = "fair";
+                            else condition = "new";
+                        }
+                        
+                        // Build the JSON object
+                        jsonResponse << "{";
+                        jsonResponse << "\"id\":" << auctionId << ",";
+                        jsonResponse << "\"title\":\"" << escapeJsonString(title) << "\",";
+                        jsonResponse << "\"current_bid\":" << currentBid << ",";
+                        jsonResponse << "\"end_time\":\"" << escapeJsonString(endTime) << "\",";
+                        jsonResponse << "\"bid_count\":" << bidCount << ",";
+                        jsonResponse << "\"category\":\"" << escapeJsonString(categoryName) << "\",";
+                        jsonResponse << "\"condition\":\"" << condition << "\"";
+                        
+                        // Only add image_url if it's not empty
+                        if (!imageUrl.empty()) {
+                            jsonResponse << ",\"image_url\":\"" << escapeJsonString(imageUrl) << "\"";
+                        }
+                        
+                        jsonResponse << "}";
+                        
+                        first = false;
+                    } catch (const std::exception& e) {
+                        std::cerr << "Error processing auction " << auctionId << ": " << e.what() << std::endl;
+                        // Continue to the next auction
+                    }
+                }
+                
+                jsonResponse << "]}";
+                return jsonResponse.str() + "\n";
+            } else {
+                return "{\"status\":\"error\",\"message\":\"Failed to retrieve auctions\"}\n";
+            }
+        }
+
+        // BID command: use bidder_id since that's the column in the database.
         if (cmd == "BID") {
             int auctionId;
             double bidAmount;
@@ -409,20 +459,52 @@ private:
             return success ? "Bid placed successfully.\n" : ("Bid failed: " + err + "\n");
         }
 
+        if (cmd == "PLACE_BID") {
+            // This command requires authentication
+            if (!authenticated) {
+                return "{\"status\":\"error\",\"message\":\"Please login to place a bid\"}\n";
+            }
+            
+            int auctionId;
+            double bidAmount;
+            
+            iss >> auctionId >> bidAmount;
+            
+            if (auctionId <= 0 || bidAmount <= 0) {
+                return "{\"status\":\"error\",\"message\":\"Invalid auction ID or bid amount\"}\n";
+            }
+            
+            Auction auction(database);
+            std::string errorMessage;
+            bool success = auction.placeBid(auctionId, userId, bidAmount, errorMessage);
+            
+            std::stringstream jsonResponse;
+            if (success) {
+                jsonResponse << "{\"action\":\"BID_UPDATE\",";
+                jsonResponse << "\"auction_id\":" << auctionId << ",";
+                jsonResponse << "\"new_bid\":" << bidAmount << ",";
+                jsonResponse << "\"user_id\":" << userId << ",";
+                jsonResponse << "\"status\":\"success\"}";
+            } else {
+                jsonResponse << "{\"status\":\"error\",\"message\":\"" << escapeJsonString(errorMessage) << "\"}";
+            }
+            
+            return jsonResponse.str() + "\n";
+        }
 
         if (cmd == "EXIT" || cmd == "QUIT") {
             running = false;
             return "Goodbye!\n";
         }
 
-        return "Unknown command.\n";
+        return "Unknown command. Available commands: LOGIN, REGISTER, GET_AUCTIONS, GET_ALL_AUCTIONS, GET_AUCTION, BID, PLACE_BID, CREATE_AUCTION, CREATE_LISTING, CREATE_LISTING_TOKEN, EXIT\n";
     }
 };
 
 class TransactionServer {
 public:
     TransactionServer(int port, Database& db)
-        : port(port), running(false), database(db) {}  // Initialize in order: port, running, database
+        : port(port), running(false), database(db) {}
 
     bool start() {
         #ifdef _WIN32
@@ -438,6 +520,23 @@ public:
             std::cerr << "Error creating socket: " << SOCKET_ERROR_CODE << std::endl;
             return false;
         }
+
+        // Set socket options to reuse address
+        #ifdef _WIN32
+            // Windows settings
+            char opt = 1;
+            if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, (const char*)&opt, sizeof(opt)) < 0) {
+                std::cerr << "setsockopt(SO_REUSEADDR) failed: " << SOCKET_ERROR_CODE << std::endl;
+                return false;
+            }
+        #else
+            // Unix settings (Linux/macOS)
+            int opt = 1;
+            if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+                std::cerr << "setsockopt(SO_REUSEADDR) failed: " << SOCKET_ERROR_CODE << std::endl;
+                return false;
+            }
+        #endif
 
         sockaddr_in serverAddr;
         serverAddr.sin_family = AF_INET;
